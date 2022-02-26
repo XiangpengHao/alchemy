@@ -9,10 +9,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use crossbeam_utils::CachePadded;
 
-use crate::{
-    storage::{pm_heap::PmHeap, Storage},
-    utils::{backoff::Backoff, nt_copy::nt_copy_nonoverlapping},
-};
+use crate::{storage::pm_heap::PmHeap, utils::backoff::Backoff};
 
 const LOG_FILE: &str = "target/log/";
 const DEFAULT_BUFFER_SIZE: usize = 1024 * 1024 * 64;
@@ -135,6 +132,7 @@ impl Logger {
         Ok(flushed)
     }
 
+    #[allow(dead_code)]
     fn flush_buffer_pm(&self, buffer_id: usize, offset: usize) {
         unsafe {
             std::ptr::copy_nonoverlapping(
@@ -146,7 +144,6 @@ impl Logger {
     }
 
     fn flush_buffer(&self, buffer_id: usize) {
-        #[cfg(not(feature = "fuzz"))]
         unsafe {
             let rt = libc::write(
                 self.raw_file,

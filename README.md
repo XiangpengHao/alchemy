@@ -1,16 +1,26 @@
 # Alchemy: **A**ttribute-**L**evel **C**aching in **He**terogeneous In-**M**emor**y** DBMS
 
-![caching](https://github.com/XiangpengHao/clock-cache/workflows/caching/badge.svg)
+![caching](https://github.com/XiangpengHao/alchemy/workflows/caching/badge.svg)
 [![codecov](https://codecov.io/gh/XiangpengHao/clock-cache/branch/master/graph/badge.svg?token=YS06KZ1RYS)](https://codecov.io/gh/XiangpengHao/clock-cache)
 
 
-Scalable persistent memory (PM) can potentially lower the cost and increase the capacity of main-memory database systems by replacing or complementing DRAM. However, modern main-memory database systems often mandate memory bandwidth beyond what commercial PM devices can offer, yet existing DRAM-based caching strategies do not fully utilize PM’s byte-addressability, leading to suboptimal performance.
+Scalable persistent memory (PM) can potentially lower the cost and increase the capacity of main-memory database systems by replacing or complementing DRAM. 
+However, modern main-memory database systems often mandate memory bandwidth beyond what commercial PM devices can offer, yet existing DRAM-based caching strategies do not fully utilize PM’s byte-addressability, leading to suboptimal performance.
 
-Alchemy is a DRAM-PM hybrid database engine built from scratch to achieve high performance at a low cost. The key is to leverages PM’s byte-addressability to cache only hot attributes in DRAM, reducing requirements on PM bandwidth. To mitigate the higher latency of PM, Alchemy leverages lightweight coroutines to overlap data fetching and computation, effectively hiding CPU stalls. Experiments using Intel Optane DCPMM show that Alchemy is up to 2×faster and 2.17×more cost-effective than highly-optimized, traditional DRAM-based designs.
+Alchemy is a DRAM-PM hybrid database engine built from scratch to achieve high performance at a low cost. The key is to leverages PM’s byte-addressability to cache only hot attributes in DRAM, reducing requirements on PM bandwidth. 
+To mitigate the higher latency of PM, Alchemy leverages lightweight coroutines to overlap data fetching and computation, effectively hiding CPU stalls. 
+Experiments using Intel Optane DCPMM show that Alchemy is up to 2×faster and 2.17×more cost-effective than highly-optimized, traditional DRAM-based designs.
 
+
+## Run Alchemy
+
+### Prerequisites
+- Nightly rust, install here https://rustup.rs
+- A linux server with Intel Optane Persistent Memory Module, configured as AppDirect mode and mounted to `/mnt/pmem`
+- An NVMe SSD (for logging) should be mounted to `/mnt/ssd`
+- [Optional] For more advanced internal metrics, the kernel should enable `msr` module and a `pcm-sensor-server` should be running in the background
 
 ### Build
-Alchemy require nightly rust to build.
 ```bash
 cargo build . --release
 ```
@@ -37,7 +47,7 @@ cargo run --bin table --release "test-name"
 
 To run TPC-C benchmark
 ```bash
-cargo run --bin tpcc --release "new-order"
+cargo run --bin tpcc --release "tpcc-basic"
 ```
 
 Alchemy collects comprehensive runtime statistics.
@@ -49,7 +59,7 @@ For example:
 cargo run --bin table --release "benchmark-name" --features "metric pcm flamegraph"
 ```
 
-All benchmark results will be redirected to a json file.
+All benchmark results will be saved to a json file.
 
 More details please check out our paper.
 
