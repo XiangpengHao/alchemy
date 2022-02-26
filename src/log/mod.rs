@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use crossbeam_utils::CachePadded;
 
-use crate::{storage::pm_heap::PmHeap, utils::backoff::Backoff};
+use crate::utils::backoff::Backoff;
 
 const LOG_FILE: &str = "target/log/";
 const DEFAULT_BUFFER_SIZE: usize = 1024 * 1024 * 64;
@@ -28,7 +28,7 @@ pub struct Logger {
     buffer_size: usize,
     should_stop: AtomicBool,
     raw_file: i32,
-    pm_buffer: *mut u8,
+    // pm_buffer: *mut u8,
     buffers: [*mut u8; 2],
 }
 
@@ -94,7 +94,7 @@ impl Logger {
             buffers,
             buffer_size,
             raw_file: raw_file_id,
-            pm_buffer: PmHeap::get().alloc_frame(60_580_196_864),
+            // pm_buffer: PmHeap::get().alloc_frame(60_580_196_864),
             flushed_offset: AtomicUsize::new(0),
             should_stop: AtomicBool::new(false),
         }
@@ -132,16 +132,16 @@ impl Logger {
         Ok(flushed)
     }
 
-    #[allow(dead_code)]
-    fn flush_buffer_pm(&self, buffer_id: usize, offset: usize) {
-        unsafe {
-            std::ptr::copy_nonoverlapping(
-                self.buffers[buffer_id] as *const u8,
-                self.pm_buffer.add(offset),
-                self.buffer_size,
-            );
-        }
-    }
+    // #[allow(dead_code)]
+    // fn flush_buffer_pm(&self, buffer_id: usize, offset: usize) {
+    //     unsafe {
+    //         // std::ptr::copy_nonoverlapping(
+    //         //     self.buffers[buffer_id] as *const u8,
+    //         //     // self.pm_buffer.add(offset),
+    //         //     self.buffer_size,
+    //         // );
+    //     }
+    // }
 
     fn flush_buffer(&self, buffer_id: usize) {
         unsafe {
