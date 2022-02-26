@@ -1,8 +1,7 @@
 # Alchemy: **A**ttribute-**L**evel **C**aching in **He**terogeneous In-**M**emor**y** DBMS
 
-![caching](https://github.com/XiangpengHao/alchemy/workflows/caching/badge.svg)
+[![alchemy](https://github.com/XiangpengHao/alchemy/actions/workflows/rust.yml/badge.svg)](https://github.com/XiangpengHao/alchemy/actions/workflows/rust.yml)
 [![codecov](https://codecov.io/gh/XiangpengHao/clock-cache/branch/master/graph/badge.svg?token=YS06KZ1RYS)](https://codecov.io/gh/XiangpengHao/clock-cache)
-
 
 Scalable persistent memory (PM) can potentially lower the cost and increase the capacity of main-memory database systems by replacing or complementing DRAM. 
 However, modern main-memory database systems often mandate memory bandwidth beyond what commercial PM devices can offer, yet existing DRAM-based caching strategies do not fully utilize PM’s byte-addressability, leading to suboptimal performance.
