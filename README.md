@@ -14,11 +14,12 @@ Experiments using Intel Optane DCPMM show that Alchemy is up to 2×faster and 2.
 
 ## Run Alchemy
 
-### Prerequisites
-- Nightly rust, install here https://rustup.rs
-- A linux server with Intel Optane Persistent Memory Module, configured as AppDirect mode and mounted to `/mnt/pmem`
-- An NVMe SSD (for logging) should be mounted to `/mnt/ssd`
-- [Optional] For more advanced internal metrics, the kernel should enable `msr` module and a `pcm-sensor-server` should be running in the background
+Alchemy is built in Rust, and it requires Rust nightly which can be installed here: https://rustup.rs
+
+Alchemy currently only supports Linux server with Intel Optane Persistent Memory Module, it must be configured as AppDirect mode and mounted to `/mnt/pmem`. 
+An NVMe SSD (for logging) should be mounted to `/mnt/ssd`.
+
+[Optional] For more advanced internal metrics, the kernel should enable `msr` module and a `pcm-sensor-server` should be running in the background
 
 ### Build
 ```bash
@@ -42,12 +43,12 @@ env ASAN_OPTIONS="detect_odr_violation=0" RUSTFLAGS="-Z sanitizer=address" cargo
 Alchemy has microbenchmarks and TPC-C benchmark.
 To run microbenchmark
 ```bash
-cargo run --bin table --release "test-name"
+cargo run --bin table --release "basic"
 ```
 
 To run TPC-C benchmark
 ```bash
-cargo run --bin tpcc --release "tpcc-basic"
+cargo run --bin tpcc --release "tpcc"
 ```
 
 Alchemy collects comprehensive runtime statistics.
