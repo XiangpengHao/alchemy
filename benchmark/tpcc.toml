@@ -1,0 +1,155 @@
+[[tpcc]]
+name = "payment_only"
+threads = [1, 2, 4, 8, 16, 24, 32]
+time = 5
+warehouse_cnt = 1024
+policy = ["Field", "Tuple"]
+txn_engine = ["Sync", "Async"]
+stock_scale = [5]
+workload = { new_order = 0, payment = 100, order_status = 0, delivery = 0, stock_level = 0}
+
+[[tpcc]]
+name = "payment_latency"
+threads = [32]
+time = 5
+warehouse_cnt = 1024
+policy = ["Field", "Tuple"]
+txn_engine = ["Sync", "Async"]
+stock_scale = [5]
+workload = { new_order = 0, payment = 100, order_status = 0, delivery = 0, stock_level = 0}
+
+[[tpcc]]
+name = "payment_direct"
+threads = [1, 2, 4, 8, 16, 24, 32]
+time = 5
+warehouse_cnt = 1024
+policy = ["Direct"]
+txn_engine = ["Sync"]
+stock_scale = [5]
+workload = { new_order = 0, payment = 100, order_status = 0, delivery = 0, stock_level = 0}
+
+[[tpcc]]
+name = "new_order_only"
+threads = [1, 2, 4, 8, 16, 24, 32]
+time = 5
+warehouse_cnt = 1024
+policy = ["Field", "Tuple"]
+txn_engine = ["Sync", "Async"]
+stock_scale = [6]
+workload = { new_order = 100, payment = 0, order_status = 0, delivery = 0, stock_level = 0}
+
+[[tpcc]]
+name = "new_order_latency"
+threads = [32]
+time = 5
+warehouse_cnt = 1024
+policy = ["Field", "Tuple"]
+txn_engine = ["Sync", "Async"]
+stock_scale = [6]
+workload = { new_order = 100, payment = 0, order_status = 0, delivery = 0, stock_level = 0}
+
+[[tpcc]]
+name = "new_order_direct"
+threads = [1, 2, 4, 8, 16, 24, 32]
+time = 5
+warehouse_cnt = 1024
+policy = ["Direct"]
+txn_engine = ["Sync"]
+stock_scale = [6]
+workload = { new_order = 100, payment = 0, order_status = 0, delivery = 0, stock_level = 0}
+
+# This is the same as running 32 thread tpcc full mix,
+# but don't forget to enable the latency feature
+[[tpcc]]
+name = "tpcc_latency"
+threads = [32]
+time = 4
+warehouse_cnt = 800 
+policy = ["Field", "Tuple"]
+txn_engine = ["Async", "Sync"]
+stock_scale = [6]
+workload = { new_order = 45, payment = 43, order_status = 4, delivery = 4, stock_level = 4}
+
+[[tpcc]]
+name = "tpcc_mm"
+threads = [1, 2, 4, 8, 16, 24, 32]
+time = 4
+warehouse_cnt = 800 
+policy = ["Tuple"]
+txn_engine = ["Sync"]
+stock_scale = [6]
+workload = { new_order = 45, payment = 43, order_status = 4, delivery = 4, stock_level = 4}
+
+[[tpcc]]
+name = "tpcc_32"
+threads = [32]
+time = 4
+warehouse_cnt = 800 
+policy = ["Field", "Tuple"]
+txn_engine = ["Sync", "Async"]
+stock_scale = [5]
+workload = { new_order = 45, payment = 43, order_status = 4, delivery = 4, stock_level = 4}
+
+[[tpcc]]
+name = "tpcc_24"
+threads = [24]
+time = 4
+warehouse_cnt = 800 
+policy = ["Field", "Tuple"]
+txn_engine = ["Sync", "Async"]
+stock_scale = [5]
+workload = { new_order = 45, payment = 43, order_status = 4, delivery = 4, stock_level = 4}
+
+[[tpcc]]
+name = "tpcc_16"
+threads = [16]
+time = 4
+warehouse_cnt = 800 
+policy = ["Field", "Tuple"]
+txn_engine = ["Sync", "Async"]
+stock_scale = [5]
+workload = { new_order = 45, payment = 43, order_status = 4, delivery = 4, stock_level = 4}
+
+[[tpcc]]
+name = "tpcc_8"
+threads = [8]
+time = 4
+warehouse_cnt = 800 
+policy = ["Field", "Tuple"]
+txn_engine = ["Sync", "Async"]
+stock_scale = [4]
+workload = { new_order = 45, payment = 43, order_status = 4, delivery = 4, stock_level = 4}
+
+
+[[tpcc]]
+name = "tpcc_4"
+threads = [4]
+time = 4
+warehouse_cnt = 800 
+policy = ["Field", "Tuple"]
+txn_engine = ["Sync", "Async"]
+stock_scale = [5]
+workload = { new_order = 45, payment = 43, order_status = 4, delivery = 4, stock_level = 4}
+
+
+[[tpcc]]
+name = "tpcc_2"
+threads = [2]
+time = 4
+warehouse_cnt = 800 
+policy = ["Field", "Tuple"]
+txn_engine = ["Sync", "Async"]
+stock_scale = [5]
+workload = { new_order = 45, payment = 43, order_status = 4, delivery = 4, stock_level = 4}
+
+
+[[tpcc]]
+name = "tpcc_1"
+threads = [1]
+time = 4
+warehouse_cnt = 800 
+policy = ["Field", "Tuple"]
+txn_engine = ["Sync", "Async"]
+stock_scale = [5]
+workload = { new_order = 45, payment = 43, order_status = 4, delivery = 4, stock_level = 4}
+

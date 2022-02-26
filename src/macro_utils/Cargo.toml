@@ -1,0 +1,22 @@
+[package]
+name = "macro_utils"
+authors = ["Xiangpeng Hao <haoxiangpeng123@gmail.com>"]
+version = "0.0.0"
+edition = "2018"
+publish = false
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = {version = "1.0", features = ["extra-traits", "full", "visit-mut"]}
+quote = "1.0"
+proc-macro2 = "1.0"
+
+[dev-dependencies]
+trybuild = "1.0"
+
+[[test]]
+name = "bench_config"
+path = "tests/bench_config.rs"
+

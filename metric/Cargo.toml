@@ -1,0 +1,11 @@
+[package]
+name = "metric"
+version = "0.1.0"
+authors = ["Xiangpeng Hao <me@haoxp.xyz>"]
+edition = "2018"
+
+[dependencies]
+serde = "1"
+metric_utils = { path = "src/metric_utils" }
+rand = "0.8"
+auto_ops = "0.3"

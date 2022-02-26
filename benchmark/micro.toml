@@ -1,0 +1,204 @@
+
+[[table]]
+name = "test-ci"
+threads = [1, 4]
+cache_size_mb = [64]
+data_size_mb = 256
+probe_len = [4]
+probe_rng = [0.1]
+distribution = ["SelfSimilar03"]
+policy = ["Field"]
+workload = ["Balanced"]
+mem_engine = ["Sync", "Async"]
+time = 2
+
+[[table]]
+name = "basic"
+threads = [1, 8, 16, 24, 32, 48]
+cache_size_mb = [256, 800]
+data_size_mb = 2048
+probe_len = [8]
+probe_rng = [0.05]
+distribution = ["SelfSimilar03", "Uniform"]
+policy = ["Field", "Tuple"]
+workload = ["ReadOnly", "Balanced", "WriteOnly"]
+mem_engine = ["Sync", "Async"]
+time = 5
+
+[[table]]
+name = "paper_size"
+threads = [32]
+cache_size_mb =[1400, 4200, 7000, 11200, 14000]
+data_size_mb = 14000
+probe_len = [8]
+probe_rng = [0.05]
+distribution = ["Uniform"]
+policy = ["Field", "Tuple"]
+workload = ["Balanced"]
+mem_engine = ["Sync", "Async"]
+time = 10
+
+# Internal: debugging only
+[[table]]
+name = "internal"
+threads = [32]
+cache_size_mb = [18000]
+data_size_mb = 60000
+probe_len = [8]
+probe_rng = [0.5]
+distribution = ["Uniform"]
+policy = ["Field", "Tuple"]
+workload = ["Balanced"]
+mem_engine = ["Sync", "Async"]
+time = 10
+
+# Explore different async group size, we don't support programmatically change the group size yet,
+# so we need to manually change the source file, don't forget!
+[[table]]
+name = "group_size"
+threads = [32]
+cache_size_mb = [15000]
+data_size_mb = 60000
+probe_len = [8]
+probe_rng = [0.1]
+distribution = ["Uniform"]
+policy = ["Field"]
+workload = ["Balanced"]
+mem_engine = ["Async"]
+time = 10
+
+# Basic figure: compares Alchemy, PM only, DRAM only and memory mode
+[[table]]
+name = "basic_alchemy"
+threads = [1, 2, 4, 8, 16, 24, 32]
+cache_size_mb = [18000]
+data_size_mb = 60000
+probe_len = [8]
+probe_rng = [0.5]
+distribution = ["Uniform"]
+policy = ["Field"]
+workload = ["Balanced"]
+mem_engine = ["Async"]
+time = 10
+
+[[table]]
+name = "basic_pm"
+threads = [1, 2, 4, 8, 16, 24, 32]
+cache_size_mb = [10]
+data_size_mb = 60000
+probe_len = [0]
+probe_rng = [0.0]
+distribution = ["Uniform"]
+policy = ["Field"]
+workload = ["Balanced"]
+mem_engine = ["Sync"]
+time = 10
+
+# Same as basic_pm_only, only to run with memory mode
+[[table]]
+name = "basic_mm"
+threads = [1, 2, 4, 8, 16, 24, 32]
+cache_size_mb = [10]
+data_size_mb = 60000
+probe_len = [0]
+probe_rng = [0.0]
+distribution = ["Uniform"]
+policy = ["Field"]
+workload = ["Balanced"]
+mem_engine = ["Sync"]
+time = 10
+
+[[table]]
+name = "basic_dram_only"
+threads = [1, 2, 4, 8, 16, 24, 32]
+cache_size_mb = [10]
+data_size_mb = 24000
+probe_len = [0]
+probe_rng = [0.0]
+distribution = ["Uniform"]
+policy = ["Tuple"]
+workload = ["Balanced"]
+mem_engine = ["Sync"]
+time = 10
+
+# Collect latency distribution, don't forget to enable latency feature
+[[table]]
+name = "basic_latency"
+threads = [32]
+cache_size_mb = [15000]
+data_size_mb = 60000
+probe_len = [8]
+probe_rng = [0.1]
+distribution = ["Uniform"]
+policy = ["Field", "Tuple"]
+workload = ["Balanced"]
+mem_engine = ["Sync", "Async"]
+time = 5
+
+[[table]]
+name = "basic_mm_latency"
+threads = [32]
+cache_size_mb = [15000]
+data_size_mb = 60000
+probe_len = [0]
+probe_rng = [0]
+distribution = ["Uniform"]
+policy = ["Tuple"]
+workload = ["Balanced"]
+mem_engine = ["Sync"]
+time = 5
+
+# Write ratio
+[[table]]
+name = "paper_workload"
+threads = [32]
+cache_size_mb = [15000]
+data_size_mb = 60000 
+probe_len = [8]
+probe_rng = [0.1]
+distribution = ["Uniform"]
+policy = ["Field", "Tuple"]
+workload = ["ReadOnly", "ReadHeavy", "Balanced", "WriteHeavy", "WriteOnly"]
+mem_engine = ["Sync", "Async"]
+time = 5
+
+[[table]]
+name = "paper_skew"
+threads = [32]
+cache_size_mb = [15000]
+data_size_mb = 60000 
+probe_len = [16]
+probe_rng = [0.5]
+distribution = ["SelfSimilar01", "SelfSimilar02", "SelfSimilar03", "SelfSimilar04", "SelfSimilar05"]
+policy = ["Field", "Tuple"]
+workload = ["Balanced"]
+mem_engine = ["Sync", "Async"]
+time = 5
+
+[[table]]
+name = "paper_replacement"
+threads = [32]
+cache_size_mb = [15000]
+data_size_mb = 60000
+probe_len = [16]
+probe_rng = [0.0, 0.1, 0.2, 0.4, 0.8]
+distribution = ["Uniform", "SelfSimilar02"]
+policy = ["Field", "Tuple"]
+workload = ["Balanced"]
+mem_engine = ["Async"]
+time = 5
+
+
+[[table]]
+name = "paper_replacement_d"
+threads = [32]
+cache_size_mb = [10]
+data_size_mb = 60000
+probe_len = [0]
+probe_rng = [0.0]
+distribution = ["Uniform", "SelfSimilar02"]
+policy = ["Direct"]
+workload = ["Balanced"]
+mem_engine = ["Sync"]
+time = 5
+
