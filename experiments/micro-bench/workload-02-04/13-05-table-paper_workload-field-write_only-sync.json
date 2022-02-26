@@ -1,0 +1,363 @@
+{
+  "config": {
+    "name": "table-paper_workload-field-write_only-sync",
+    "threads": [
+      32
+    ],
+    "cache_size_mb": 15000,
+    "data_size_mb": 60000,
+    "probe_len": 8,
+    "distribution": "Uniform",
+    "policy": "Field",
+    "workload": "WriteOnly",
+    "time": 5,
+    "probe_rng": 0.1,
+    "mem_engine": "Sync"
+  },
+  "load": {
+    "async_group_size": 4,
+    "log_entry_size": 24,
+    "metrics_enabled": true
+  },
+  "cleanup": {
+    "future_size": 0
+  },
+  "env": {
+    "os_release": "5.0.21",
+    "rustc_version": "1.59.0",
+    "hostname": "kanwu-Super-Server",
+    "cpu_num": 32,
+    "cpu_speed": 1000
+  },
+  "run": [
+    {
+      "thread_cnt": 32,
+      "results": [
+        {
+          "commit": 3247837,
+          "abort": 0,
+          "metrics": {
+            "counters": {
+              "read_hit": 138855708,
+              "read_miss": 23536682,
+              "probe_miss": 0,
+              "read_schema_miss": 0,
+              "read_cnt": 162392390,
+              "update_cnt": 0,
+              "insert_cnt": 0,
+              "update_schema_miss": 0,
+              "update_hit": 0,
+              "update_miss": 0,
+              "abort_read_lock_busy": 0,
+              "abort_write_lock_busy": 0,
+              "abort_upgrade_lock_busy": 0,
+              "abort_idx_not_found": 0,
+              "abort_lock_busy": 0,
+              "delivery_new_order_not_found": 0,
+              "new_order_rollback": 0
+            },
+            "histograms": {
+              "prob_len": {
+                "1": 37326,
+                "3": 13,
+                "0": 2315673,
+                "2": 876
+              },
+              "hotness": {},
+              "scanned": {},
+              "payment_customer_scan": {},
+              "os_order_scan": {},
+              "order_line_scan": {},
+              "stock_level_quantity": {}
+            },
+            "timers": {
+              "read": [],
+              "tpcc": []
+            },
+            "ctx_counter": {}
+          }
+        },
+        {
+          "commit": 3257054,
+          "abort": 0,
+          "metrics": {
+            "counters": {
+              "read_hit": 138608401,
+              "read_miss": 24244909,
+              "probe_miss": 0,
+              "read_schema_miss": 0,
+              "read_cnt": 162853310,
+              "update_cnt": 0,
+              "insert_cnt": 0,
+              "update_schema_miss": 0,
+              "update_hit": 0,
+              "update_miss": 0,
+              "abort_read_lock_busy": 0,
+              "abort_write_lock_busy": 0,
+              "abort_upgrade_lock_busy": 0,
+              "abort_idx_not_found": 0,
+              "abort_lock_busy": 0,
+              "delivery_new_order_not_found": 0,
+              "new_order_rollback": 0
+            },
+            "histograms": {
+              "prob_len": {
+                "2": 5896,
+                "5": 1,
+                "1": 114552,
+                "3": 320,
+                "4": 23,
+                "0": 2302598
+              },
+              "hotness": {},
+              "scanned": {},
+              "payment_customer_scan": {},
+              "os_order_scan": {},
+              "order_line_scan": {},
+              "stock_level_quantity": {}
+            },
+            "timers": {
+              "read": [],
+              "tpcc": []
+            },
+            "ctx_counter": {}
+          }
+        },
+        {
+          "commit": 3260016,
+          "abort": 0,
+          "metrics": {
+            "counters": {
+              "read_hit": 139339054,
+              "read_miss": 23662466,
+              "probe_miss": 0,
+              "read_schema_miss": 0,
+              "read_cnt": 163001520,
+              "update_cnt": 0,
+              "insert_cnt": 0,
+              "update_schema_miss": 0,
+              "update_hit": 0,
+              "update_miss": 0,
+              "abort_read_lock_busy": 0,
+              "abort_write_lock_busy": 0,
+              "abort_upgrade_lock_busy": 0,
+              "abort_idx_not_found": 0,
+              "abort_lock_busy": 0,
+              "delivery_new_order_not_found": 0,
+              "new_order_rollback": 0
+            },
+            "histograms": {
+              "prob_len": {
+                "2": 14966,
+                "3": 1330,
+                "1": 179449,
+                "5": 7,
+                "0": 2173663,
+                "6": 1,
+                "4": 127
+              },
+              "hotness": {},
+              "scanned": {},
+              "payment_customer_scan": {},
+              "os_order_scan": {},
+              "order_line_scan": {},
+              "stock_level_quantity": {}
+            },
+            "timers": {
+              "read": [],
+              "tpcc": []
+            },
+            "ctx_counter": {}
+          }
+        },
+        {
+          "commit": 3249849,
+          "abort": 0,
+          "metrics": {
+            "counters": {
+              "read_hit": 137613184,
+              "read_miss": 24879956,
+              "probe_miss": 0,
+              "read_schema_miss": 0,
+              "read_cnt": 162493140,
+              "update_cnt": 0,
+              "insert_cnt": 0,
+              "update_schema_miss": 0,
+              "update_hit": 0,
+              "update_miss": 0,
+              "abort_read_lock_busy": 0,
+              "abort_write_lock_busy": 0,
+              "abort_upgrade_lock_busy": 0,
+              "abort_idx_not_found": 0,
+              "abort_lock_busy": 0,
+              "delivery_new_order_not_found": 0,
+              "new_order_rollback": 0
+            },
+            "histograms": {
+              "prob_len": {
+                "5": 49,
+                "6": 5,
+                "2": 28646,
+                "4": 432,
+                "3": 3394,
+                "0": 2204365,
+                "7": 1,
+                "1": 250947
+              },
+              "hotness": {},
+              "scanned": {},
+              "payment_customer_scan": {},
+              "os_order_scan": {},
+              "order_line_scan": {},
+              "stock_level_quantity": {}
+            },
+            "timers": {
+              "read": [],
+              "tpcc": []
+            },
+            "ctx_counter": {}
+          }
+        },
+        {
+          "commit": 3252467,
+          "abort": 0,
+          "metrics": {
+            "counters": {
+              "read_hit": 138199981,
+              "read_miss": 24423979,
+              "probe_miss": 1,
+              "read_schema_miss": 0,
+              "read_cnt": 162623960,
+              "update_cnt": 0,
+              "insert_cnt": 0,
+              "update_schema_miss": 0,
+              "update_hit": 0,
+              "update_miss": 0,
+              "abort_read_lock_busy": 0,
+              "abort_write_lock_busy": 0,
+              "abort_upgrade_lock_busy": 0,
+              "abort_idx_not_found": 0,
+              "abort_lock_busy": 0,
+              "delivery_new_order_not_found": 0,
+              "new_order_rollback": 0
+            },
+            "histograms": {
+              "prob_len": {
+                "5": 134,
+                "1": 293035,
+                "2": 41760,
+                "6": 32,
+                "0": 2100524,
+                "3": 6368,
+                "7": 1,
+                "4": 915
+              },
+              "hotness": {},
+              "scanned": {},
+              "payment_customer_scan": {},
+              "os_order_scan": {},
+              "order_line_scan": {},
+              "stock_level_quantity": {}
+            },
+            "timers": {
+              "read": [],
+              "tpcc": []
+            },
+            "ctx_counter": {}
+          }
+        },
+        {
+          "commit": 3249588,
+          "abort": 0,
+          "metrics": {
+            "counters": {
+              "read_hit": 137824522,
+              "read_miss": 24655588,
+              "probe_miss": 0,
+              "read_schema_miss": 0,
+              "read_cnt": 162480110,
+              "update_cnt": 0,
+              "insert_cnt": 0,
+              "update_schema_miss": 0,
+              "update_hit": 0,
+              "update_miss": 0,
+              "abort_read_lock_busy": 0,
+              "abort_write_lock_busy": 0,
+              "abort_upgrade_lock_busy": 0,
+              "abort_idx_not_found": 0,
+              "abort_lock_busy": 0,
+              "delivery_new_order_not_found": 0,
+              "new_order_rollback": 0
+            },
+            "histograms": {
+              "prob_len": {
+                "5": 310,
+                "6": 57,
+                "3": 10688,
+                "0": 2040290,
+                "2": 60832,
+                "4": 1769,
+                "1": 352283,
+                "7": 13
+              },
+              "hotness": {},
+              "scanned": {},
+              "payment_customer_scan": {},
+              "os_order_scan": {},
+              "order_line_scan": {},
+              "stock_level_quantity": {}
+            },
+            "timers": {
+              "read": [],
+              "tpcc": []
+            },
+            "ctx_counter": {}
+          }
+        }
+      ],
+      "pcm": [
+        {
+          "pm_read": 976045824,
+          "pm_write": 612939648,
+          "dram_read": 5284470208,
+          "dram_write": 5284470208,
+          "l3_hit": 12301151,
+          "l3_miss": 85148078,
+          "upi_in_util": 0.0,
+          "upi_out_util": 0.0
+        },
+        {
+          "pm_read": 1003398976,
+          "pm_write": 630217856,
+          "dram_read": 5368735680,
+          "dram_write": 5368735680,
+          "l3_hit": 12455460,
+          "l3_miss": 86635045,
+          "upi_in_util": 0.0,
+          "upi_out_util": 0.0
+        },
+        {
+          "pm_read": 1005331200,
+          "pm_write": 631335872,
+          "dram_read": 5374799424,
+          "dram_write": 5374799424,
+          "l3_hit": 12487122,
+          "l3_miss": 86709669,
+          "upi_in_util": 0.0,
+          "upi_out_util": 0.0
+        },
+        {
+          "pm_read": 992297152,
+          "pm_write": 623218560,
+          "dram_read": 5372890496,
+          "dram_write": 5372890496,
+          "l3_hit": 12480038,
+          "l3_miss": 86585602,
+          "upi_in_util": 0.0,
+          "upi_out_util": 0.0
+        }
+      ],
+      "perf": null
+    }
+  ]
+}

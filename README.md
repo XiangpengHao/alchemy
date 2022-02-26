@@ -60,7 +60,22 @@ cargo run --bin table --release "benchmark-name" --features "metric pcm flamegra
 
 All benchmark results will be saved to a json file.
 
-More details please check out our paper.
+## Alchemy benchmark results
+We conduct experiments on a server equipped with a 16-core (32
+hyperthreads) Intel Xeon Gold 5218 CPU clocked at 2.3GHz with
+22 MB of on-chip SRAM cache. 
+The machine has 32GB of DRAM (two channels, 16GB each) and 512GB of Intel Optane DCPMM (four channels, 128GB each); both DRAM and DCPMM DIMMs are distributed across memory channels to max out the available bandwidth. 
 
+Our experiments run on Ubuntu Linux 18.04 with Linux kernel 5.0.21; 
+the source code is implemented and compiled using Rust 1.58. 
+The database accesses PM using normal load and store instructions enabled by the mmap interface under the fsdax
+mode. 
+
+For each experiment, we run the program for a warmup
+period so that the performance numbers stabilize. 
+We then measure performance for four runs, with 15-second each, and report the average performance of the four runs. Every experiment has logging enabled, which sends data to an NVMe SSD with a write bandwidth of ∼2.7GB/s; 
+the maximum write traffic of all experiments is ∼700MB/s,indicating that logging to SSD is not a bottleneck.
+
+Raw benchmark data can be found in the `experiments/` folder of this repo.
 
 
