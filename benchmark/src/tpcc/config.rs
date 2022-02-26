@@ -73,21 +73,15 @@ impl WorkloadMix {
     }
 }
 
-use shumai::shumai_config;
-#[shumai_config]
-pub mod bench_config {
-    use crate::CachePolicy;
-
-    use super::*;
-    pub struct Tpcc {
-        pub name: String,
-        pub time: usize,
-        pub threads: Vec<usize>,
-        pub warehouse_cnt: usize,
-        #[matrix]
-        pub policy: CachePolicy,
-        #[matrix]
-        pub txn_engine: TxnEngine,
-        pub workload: WorkloadMix,
-    }
+#[shumai::config(path = "tpcc.toml")]
+pub struct Tpcc {
+    pub name: String,
+    pub time: usize,
+    pub threads: Vec<usize>,
+    pub warehouse_cnt: usize,
+    #[matrix]
+    pub policy: crate::CachePolicy,
+    #[matrix]
+    pub txn_engine: TxnEngine,
+    pub workload: WorkloadMix,
 }

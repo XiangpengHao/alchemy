@@ -81,14 +81,13 @@ impl fmt::Display for MemEngine {
     }
 }
 
-use shumai::shumai_config;
-
-#[shumai_config]
 pub mod bench_config {
     use crate::CachePolicy;
+    use shumai::config;
 
     use super::{Distribution, MemEngine, Replacement, Workload};
 
+    #[config(path = "micro.toml")]
     pub struct Cache {
         pub name: String,
         pub threads: Vec<usize>,
@@ -106,6 +105,7 @@ pub mod bench_config {
         pub time: usize,
     }
 
+    #[config(path = "micro.toml")]
     pub struct Table {
         pub name: String,
         pub threads: Vec<usize>,
@@ -127,6 +127,7 @@ pub mod bench_config {
         pub mem_engine: MemEngine,
     }
 
+    #[config(path = "micro.toml")]
     pub struct Transaction {
         pub name: String,
         pub time: usize,
@@ -140,6 +141,7 @@ pub mod bench_config {
         pub mem_engine: MemEngine,
     }
 
+    #[config(path = "micro.toml")]
     pub struct Schema {
         pub name: String,
         pub time: usize,

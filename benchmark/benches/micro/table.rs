@@ -310,10 +310,7 @@ where
 }
 
 fn main() {
-    let filter = std::env::args().nth(1).unwrap_or_else(|| ".*".to_string());
-
-    let configs =
-        TableConfig::load_with_filter("micro.toml", filter).expect("no table config found!");
+    let configs = TableConfig::load().expect("no table config found!");
 
     for c in configs {
         // A lot larger than needed storage size to support insert operations

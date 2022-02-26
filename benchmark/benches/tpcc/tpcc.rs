@@ -1,6 +1,6 @@
 use benchmark::{
     tpcc::{
-        config::{self, bench_config::Tpcc as TpccConfig, Workload},
+        config::{self, Tpcc as TpccConfig, Workload},
         query::{
             delivery::DeliveryInput, new_order::NewOrderInput, order_status::OrderStatusInput,
             payment::PaymentInput, stock_level::StockLevelInput,
@@ -313,8 +313,7 @@ pub fn register_panic_handler() {
 }
 
 fn main() -> Result<(), TransactionError> {
-    let filter = std::env::args().nth(1).unwrap_or_else(|| ".*".to_string());
-    let configs = TpccConfig::load_with_filter("tpcc.toml", filter).expect("no config found!");
+    let configs = TpccConfig::load().expect("no config found!");
 
     // register_panic_handler();
 
