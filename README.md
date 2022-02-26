@@ -1,4 +1,5 @@
-# Alchemy: **A**ttribute-**L**evel **C**aching in **He**terogeneous In-**M**emor**y** DBMS
+# Alchemy
+**A**ttribute-**L**evel **C**aching in **He**terogeneous In-**M**emor**y** DBMS
 
 [![alchemy](https://github.com/XiangpengHao/alchemy/actions/workflows/rust.yml/badge.svg)](https://github.com/XiangpengHao/alchemy/actions/workflows/rust.yml)
 [![codecov](https://codecov.io/gh/XiangpengHao/clock-cache/branch/master/graph/badge.svg?token=YS06KZ1RYS)](https://codecov.io/gh/XiangpengHao/clock-cache)

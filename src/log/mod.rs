@@ -243,7 +243,7 @@ mod tests {
                 for _i in 0..log_entry {
                     let _lsn = logger.acquire_lsn();
                     logger.append_log(&buffer);
-                    std::thread::sleep(Duration::from_millis(6));
+                    std::thread::sleep(Duration::from_millis(100));
                 }
 
                 finished.fetch_add(1, Ordering::SeqCst);
