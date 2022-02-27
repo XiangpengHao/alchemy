@@ -1,1 +1,1 @@
-*.json linguist-language=Rust
+experiments/* linguist-vendored
