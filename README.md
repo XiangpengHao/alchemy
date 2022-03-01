@@ -87,3 +87,8 @@ the maximum write traffic of all experiments is ∼700MB/s,indicating that loggi
 We open source all of our raw benchmark data in the [`experiments/`](https://github.com/XiangpengHao/alchemy/tree/main/experiments) folder.
 
 
+## Related projects
+[Congee](https://github.com/XiangpengHao/congee): A Rust implementation of concurrent ART (adaptive radix tree). Alchemy uses congee to implement range query.
+
+[Shumai](https://github.com/XiangpengHao/shumai): Shumai is a multi-thread benchmarking framework that produces accurate and reproducible results.
+All the benchmarks of Alchemy are powered by Shumai.
