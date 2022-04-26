@@ -6,7 +6,7 @@ pub mod oid;
 mod tests;
 
 use crate::{
-    cache_manager::Rid,
+    attribute_cache::Rid,
     error::TransactionError,
     query::FieldsMeta,
     storage::{oid_array::OidArray, Storage},
@@ -21,7 +21,7 @@ use metric::{counter, Counter, CtxCounter};
 use oid::{OidReadGuard, OidWriteGuard};
 
 pub(crate) struct ClockCache<S: Schema> {
-    pub(crate) inner: CacheInner<S>,
+    inner: CacheInner<S>,
     storage: Storage<S::Tuple>,
     oid_array: OidArray,
 }
@@ -41,13 +41,7 @@ where
         schema: S,
         metric_ctx: Option<CtxCounter>,
     ) -> ClockCache<S> {
-        let inner = CacheInner::new(
-            cache_size,
-            probe_rng,
-            probe_len,
-            schema,
-            metric_ctx,
-        );
+        let inner = CacheInner::new(cache_size, probe_rng, probe_len, schema, metric_ctx);
         let tuple_cnt = storage_size / std::mem::size_of::<S::Tuple>();
         let oid_array = OidArray::new(tuple_cnt);
         let storage = Storage::new(oid_array.capacity());

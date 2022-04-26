@@ -2,7 +2,7 @@ use std::{alloc, mem};
 
 use crate::{
     async_task::Prefetcher,
-    cache_manager::{
+    attribute_cache::{
         clock_cache::oid::{LockedOid, OidWriteGuard},
         Rid,
     },

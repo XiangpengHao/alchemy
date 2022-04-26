@@ -1,5 +1,5 @@
 use alchemy::{
-    cache_manager::{Rid, Schema},
+    attribute_cache::{Rid, Schema},
     error::TransactionError,
 };
 use metric::{histogram, Histogram};
@@ -132,7 +132,9 @@ where
         );
         let mut rid_buffer = [Rid::from_u32(0); 12];
 
-        let scanned = self.order.range(order_low, order_high, &mut rid_buffer, &guard);
+        let scanned = self
+            .order
+            .range(order_low, order_high, &mut rid_buffer, &guard);
         let most_recent = match scanned {
             Some(cnt) => {
                 histogram!(Histogram::OSOrderScan, cnt as u64);
@@ -168,7 +170,9 @@ where
             u16::MAX as usize,
         );
 
-        let scanned = self.order_line.range(ol_low, ol_high, &mut rid_buffer, &guard);
+        let scanned = self
+            .order_line
+            .range(ol_low, ol_high, &mut rid_buffer, &guard);
         let cnt = match scanned {
             Some(cnt) => {
                 histogram!(Histogram::OrderLineScan, cnt as u64);

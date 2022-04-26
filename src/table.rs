@@ -6,7 +6,7 @@ use std::{
 };
 
 use crate::{
-    cache_manager::{
+    attribute_cache::{
         clock_cache::oid::{OidGuard, OidReadGuard, OidWriteGuard},
         ClockCache, QueryValue, Rid, Schema,
     },

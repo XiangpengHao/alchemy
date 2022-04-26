@@ -16,7 +16,7 @@ use metric::{histogram, Histogram};
 
 use alchemy::{
     block_on,
-    cache_manager::{Rid, Schema},
+    attribute_cache::{Rid, Schema},
     error::TransactionError,
 };
 use rand::{prelude::SmallRng, thread_rng, Rng, SeedableRng};

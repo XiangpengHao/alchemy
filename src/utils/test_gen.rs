@@ -1,9 +1,9 @@
 use crate::{
-    cache_manager::Tuple,
+    attribute_cache::Tuple,
     query::{FieldsMeta, FieldsValue, UpdateQuery},
 };
 use crate::{
-    cache_manager::{QueryValue, Schema},
+    attribute_cache::{QueryValue, Schema},
     query::Field,
 };
 

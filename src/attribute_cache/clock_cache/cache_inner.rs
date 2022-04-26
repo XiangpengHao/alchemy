@@ -1,7 +1,6 @@
-#![allow(clippy::question_mark)]
 use crate::{
     async_task::Prefetcher,
-    cache_manager::{Rid, Schema},
+    attribute_cache::{Rid, Schema},
     storage::{oid_array::OidArray, Storage},
 };
 use metric::{counter, histogram, Counter, CtxCounter, Histogram};
@@ -58,7 +57,7 @@ impl<T> ClockNode<T> {
 }
 
 #[repr(C)]
-pub struct CacheInner<S: Schema>
+pub(super) struct CacheInner<S: Schema>
 where
     S::Tuple: 'static,
 {
@@ -122,14 +121,14 @@ impl<S: Schema> CacheInner<S> {
     }
 
     /// To reset the oid to 0, this is for benchmark only
-    pub fn reset(&mut self) {
+    pub(super) fn reset(&mut self) {
         for i in 0..self.capacity as usize {
             let cur_entry = unsafe { &mut *self.entries.add(i) };
             cur_entry.rid = AtomicU32::new(u32::MAX);
         }
     }
 
-    pub fn new(
+    pub(super) fn new(
         cache_size: usize,
         probe_rng: f32,
         probe_len: usize,
@@ -137,13 +136,7 @@ impl<S: Schema> CacheInner<S> {
         metric_ctx: Option<CtxCounter>,
     ) -> Self {
         let cap = cache_size / mem::size_of::<ClockNode<S::Field>>();
-        CacheInner::new_cap(
-            cap,
-            probe_len,
-            probe_rng,
-            schema,
-            metric_ctx,
-        )
+        CacheInner::new_cap(cap, probe_len, probe_rng, schema, metric_ctx)
     }
 
     /// Init the tls_index so it will scatter around the whole entry space,
@@ -167,7 +160,7 @@ impl<S: Schema> CacheInner<S> {
         assert!(lock.is_rid());
         let rid = lock.to_rid();
 
-        let cached_item = self.schema.to_cached(&val);
+        let cached_item = self.schema.to_cached(val);
 
         let clock_node = ClockNode::new(cached_item, rid);
 
@@ -334,7 +327,7 @@ impl<S: Schema> CacheInner<S> {
 
             counter!(Counter::ReadHit, self.metric_ctx);
 
-            Ok(&entry)
+            Ok(entry)
         } else {
             counter!(Counter::ReadMiss, self.metric_ctx);
             debug_assert!(oid.is_rid());
@@ -351,12 +344,12 @@ impl<S: Schema> CacheInner<S> {
         self.schema.write_back(unsafe { &*old.val.get() }, tuple);
     }
 
-    pub fn capacity(&self) -> usize {
+    pub(super) fn capacity(&self) -> usize {
         self.capacity as usize
     }
 
     #[allow(dead_code)]
-    pub fn probe_len(&self) -> usize {
+    pub(super) fn probe_len(&self) -> usize {
         self.probe_len as usize
     }
 
@@ -375,7 +368,7 @@ impl<S: Schema> CacheInner<S> {
             .load(Ordering::Relaxed) as usize
     }
 
-    pub fn schema(&self) -> &S {
+    pub(super) fn schema(&self) -> &S {
         &self.schema
     }
 }

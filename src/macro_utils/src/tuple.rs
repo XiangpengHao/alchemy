@@ -6,7 +6,7 @@ pub fn derive_tuple(input: TokenStream) -> TokenStream {
     let name = ast.ident;
 
     let output = quote! {
-        impl alchemy::cache_manager::Tuple for #name {
+        impl alchemy::attribute_cache::Tuple for #name {
             fn to_query_values<const N: usize>(
                 &self,
                 query: &alchemy::query::FieldsMeta<N>,

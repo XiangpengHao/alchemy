@@ -1,8 +1,8 @@
-use crate::cache_manager::Schema;
+use crate::attribute_cache::Schema;
 use crate::utils::test_gen::{value_compare, FieldItemSchema, TestItem};
 use crate::{
     async_task::block_on,
-    cache_manager::Rid,
+    attribute_cache::Rid,
     query::{Field, FieldsMeta},
     utils::TestGen,
 };

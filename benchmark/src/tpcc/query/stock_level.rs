@@ -12,7 +12,7 @@ use bincode::Encode;
 use metric::{histogram, Histogram};
 
 use alchemy::{
-    cache_manager::{Rid, Schema},
+    attribute_cache::{Rid, Schema},
     error::TransactionError,
 };
 use rand::{thread_rng, Rng};

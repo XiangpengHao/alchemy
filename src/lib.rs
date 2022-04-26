@@ -7,7 +7,7 @@
 #![feature(core_intrinsics)]
 
 pub(crate) mod async_task;
-pub mod cache_manager;
+pub mod attribute_cache;
 pub mod error;
 pub mod index;
 pub mod log;

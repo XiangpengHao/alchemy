@@ -1,4 +1,4 @@
-use crate::{cache_manager::Rid, utils::obj_alloc::poison_memory_region};
+use crate::{attribute_cache::Rid, utils::obj_alloc::poison_memory_region};
 use std::{cell::UnsafeCell, mem};
 
 use super::pm_heap::PmHeap;

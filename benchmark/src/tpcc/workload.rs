@@ -1,7 +1,7 @@
 use std::{str::FromStr, time::SystemTime};
 
 use alchemy::{
-    cache_manager::Schema,
+    attribute_cache::Schema,
     index::{congee, Art, DbIndex},
     table::DbTable,
 };

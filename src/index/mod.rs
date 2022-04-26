@@ -1,4 +1,4 @@
-use crate::cache_manager::Rid;
+use crate::attribute_cache::Rid;
 pub use congee;
 use congee::epoch::Guard;
 pub use flurry;
@@ -27,7 +27,7 @@ impl Art {
         out_buffer: &mut [(usize, usize)],
         guard: &Guard,
     ) -> usize {
-        self.0.range(&low, &high, out_buffer, &guard)
+        self.0.range(&low, &high, out_buffer, guard)
     }
 }
 
@@ -46,7 +46,7 @@ impl DbIndex for Art {
 
     #[inline]
     fn get<'a>(&'a self, key: &usize, guard: &'a Self::Guard) -> Option<Rid> {
-        let v = self.0.get(&key, guard)?;
+        let v = self.0.get(key, guard)?;
         Some(v)
     }
 

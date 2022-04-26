@@ -2,7 +2,7 @@ use std::time::SystemTime;
 
 use alchemy::{
     block_on,
-    cache_manager::{
+    attribute_cache::{
         clock_cache::oid::{OidReadGuard, OidWriteGuard},
         Schema,
     },

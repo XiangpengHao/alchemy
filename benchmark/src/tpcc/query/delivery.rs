@@ -1,7 +1,7 @@
 use std::time::SystemTime;
 
 use alchemy::{
-    cache_manager::{Rid, Schema},
+    attribute_cache::{Rid, Schema},
     error::TransactionError,
 };
 use metric::{histogram, Histogram};

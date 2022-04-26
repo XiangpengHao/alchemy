@@ -8,7 +8,7 @@ use crate::{
     },
     utils::FixedString,
 };
-use alchemy::{cache_manager::Schema, query::Field};
+use alchemy::{attribute_cache::Schema, query::Field};
 use memoffset::{offset_of, span_of};
 
 pub struct GeneralSchema<T> {

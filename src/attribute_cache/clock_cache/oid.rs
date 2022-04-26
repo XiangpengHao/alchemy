@@ -1,4 +1,4 @@
-use crate::{cache_manager::Rid, error::TransactionError};
+use crate::{attribute_cache::Rid, error::TransactionError};
 use crossbeam_utils::Backoff;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::{fmt, usize};
