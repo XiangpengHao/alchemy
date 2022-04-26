@@ -36,7 +36,7 @@ fn clock_insert() {
         let cur_oid = block_on(cache.inner.oid_array.get(*rid)).read();
         if cur_oid.is_rid() {
             let p = cur_oid.to_rid();
-            let storage_p = unsafe { &*cache.inner.storage.get(p).get() };
+            let storage_p = unsafe { &*cache.storage.get(p).get() };
             let item = storage_p.clone();
             assert_eq!(item, TestItem::from_increasing(i));
         } else {

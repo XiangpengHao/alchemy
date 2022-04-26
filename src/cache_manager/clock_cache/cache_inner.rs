@@ -69,13 +69,10 @@ where
     pub(super) metric_ctx: Option<CtxCounter>,
     schema: S,
     tls_index: ThreadLocal<AtomicU32>,
-    pub(super) storage: Storage<S::Tuple>,
     pub(super) oid_array: OidArray,
     entries: *mut ClockNode<S::Field>,
 }
 
-unsafe impl<S: Schema + Send> Send for CacheInner<S> {}
-unsafe impl<S: Schema + Sync> Sync for CacheInner<S> {}
 
 impl<S: Schema> Drop for CacheInner<S> {
     fn drop(&mut self) {
@@ -118,11 +115,9 @@ impl<S: Schema> CacheInner<S> {
             cur_entry.rid = AtomicU32::new(u32::MAX);
         }
         let oid_array = OidArray::new(tuple_cnt);
-        let storage = Storage::new(oid_array.capacity());
 
         CacheInner {
             entries,
-            storage,
             oid_array,
             tls_index: ThreadLocal::new(),
             capacity: cache_cnt as u32,
@@ -177,21 +172,20 @@ impl<S: Schema> CacheInner<S> {
         });
     }
 
-    /// Insert:
-    /// 1. Insert to storage
-    /// 2. Store the storage pointer into the ClockNode
-    pub(crate) fn insert<'a>(&'a self, lock: &mut OidWriteGuard<'a>, val: S::Tuple) {
-        counter!(Counter::InsertCnt, self.metric_ctx);
+    pub(crate) fn insert<'a>(
+        &'a self,
+        lock: &mut OidWriteGuard<'a>,
+        val: &S::Tuple,
+        storage: &Storage<S::Tuple>,
+    ) {
         assert!(lock.is_rid());
         let rid = lock.to_rid();
 
         let cached_item = self.schema.to_cached(&val);
 
-        self.storage.insert(&rid, val);
-
         let clock_node = ClockNode::new(cached_item, rid);
 
-        let _index = self.probe_and_replace_rng(clock_node, rid, lock, 1.0);
+        let _index = self.probe_and_replace_rng(clock_node, rid, lock, 1.0, storage);
     }
 
     /// returns new index
@@ -210,6 +204,7 @@ impl<S: Schema> CacheInner<S> {
         rid: Rid,
         oid: &mut OidWriteGuard<'a>,
         probability: f64,
+        storage: &Storage<S::Tuple>,
     ) -> Option<usize> {
         if !rand::thread_rng().gen_bool(probability) {
             return None;
@@ -265,7 +260,7 @@ impl<S: Schema> CacheInner<S> {
                 let oid_to_evict = oid_to_evict.unwrap();
                 oid_to_evict.store_rid(&cur_entry.rid());
 
-                self.replace(cur_index, new_node);
+                self.replace(cur_index, new_node, storage);
 
                 oid.store_index(cur_index);
 
@@ -277,7 +272,11 @@ impl<S: Schema> CacheInner<S> {
         None
     }
 
-    pub(crate) async fn promote_entry<'a>(&'a self, oid: &mut OidWriteGuard<'a>) -> Option<usize> {
+    pub(crate) async fn promote_entry<'a>(
+        &'a self,
+        oid: &mut OidWriteGuard<'a>,
+        storage: &Storage<S::Tuple>,
+    ) -> Option<usize> {
         if oid.is_cached() {
             counter!(Counter::ReadHit, self.metric_ctx);
             return Some(oid.to_cache_index());
@@ -285,7 +284,7 @@ impl<S: Schema> CacheInner<S> {
 
         // We now hit a cache miss and prefetch the data on NVM
         let tuple_rid = oid.to_rid();
-        let tuple = self.storage.get(tuple_rid);
+        let tuple = storage.get(tuple_rid);
 
         counter!(Counter::ReadMiss, self.metric_ctx);
 
@@ -300,17 +299,18 @@ impl<S: Schema> CacheInner<S> {
         let cached_item = self.schema.to_cached(unsafe { &*tuple.get() });
         let new_node = ClockNode::new(cached_item, tuple_rid);
 
-        self.probe_and_replace_rng(new_node, tuple_rid, oid, self.probe_rng as f64)
+        self.probe_and_replace_rng(new_node, tuple_rid, oid, self.probe_rng as f64, storage)
     }
 
     /// Read with exclusive lock
     pub(super) async fn read_and_promote<'a: 'b, 'b>(
         &'a self,
         oid: &'b mut OidWriteGuard<'a>,
+        storage: &Storage<S::Tuple>,
     ) -> Result<&'a ClockNode<S::Field>, Rid> {
         counter!(Counter::ReadCnt, self.metric_ctx);
 
-        let cache_idx = self.promote_entry(oid).await;
+        let cache_idx = self.promote_entry(oid, storage).await;
 
         match cache_idx {
             Some(idx) => {
@@ -347,12 +347,12 @@ impl<S: Schema> CacheInner<S> {
         }
     }
 
-    fn replace(&self, index: usize, new: ClockNode<S::Field>) {
+    fn replace(&self, index: usize, new: ClockNode<S::Field>, storage: &Storage<S::Tuple>) {
         // when _old goes out of scope, the drop will persist the node if it's dirty
         let old = mem::replace(self.get_entry_mut(index), new);
-        let storage = self.storage.get_mut(&old.rid());
+        let tuple = storage.get_mut(&old.rid());
 
-        self.schema.write_back(unsafe { &*old.val.get() }, storage);
+        self.schema.write_back(unsafe { &*old.val.get() }, tuple);
     }
 
     pub fn capacity(&self) -> usize {

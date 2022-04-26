@@ -5,7 +5,7 @@ pub mod oid;
 #[cfg(test)]
 mod tests;
 
-use crate::{cache_manager::Rid, error::TransactionError, query::FieldsMeta};
+use crate::{cache_manager::Rid, error::TransactionError, query::FieldsMeta, storage::Storage};
 
 use self::oid::OidGuard;
 
@@ -17,7 +17,11 @@ use oid::{OidReadGuard, OidWriteGuard};
 
 pub(crate) struct ClockCache<S: Schema> {
     pub(crate) inner: CacheInner<S>,
+    storage: Storage<S::Tuple>,
 }
+
+unsafe impl<S: Schema + Send> Send for ClockCache<S> {}
+unsafe impl<S: Schema + Sync> Sync for ClockCache<S> {}
 
 impl<S> ClockCache<S>
 where
@@ -31,17 +35,17 @@ where
         schema: S,
         metric_ctx: Option<CtxCounter>,
     ) -> ClockCache<S> {
-        Self {
-            inner: CacheInner::new(
-                cache_size,
-                probe_rng,
-                probe_len,
-                storage_size,
-                6,
-                schema,
-                metric_ctx,
-            ),
-        }
+        let inner = CacheInner::new(
+            cache_size,
+            probe_rng,
+            probe_len,
+            storage_size,
+            6,
+            schema,
+            metric_ctx,
+        );
+        let storage = Storage::new(inner.oid_array.capacity());
+        Self { inner, storage }
     }
 
     #[inline]
@@ -61,8 +65,10 @@ where
 
     #[inline]
     pub(crate) fn insert(&self, val: S::Tuple) -> (Rid, OidWriteGuard<'_>) {
+        counter!(Counter::InsertCnt, self.inner.metric_ctx);
         let (rid, mut write_guard) = self.inner.oid_array.alloc_rid();
-        self.inner.insert(&mut write_guard, val);
+        self.inner.insert(&mut write_guard, &val, &self.storage);
+        self.storage.insert(&rid, val);
 
         (rid, write_guard)
     }
@@ -82,12 +88,12 @@ where
                 } else {
                     counter!(Counter::ReadSchemaMiss, self.inner.metric_ctx);
                     let rid = entry.rid();
-                    let tuple = self.inner.storage.get(rid);
+                    let tuple = self.storage.get(rid);
                     QueryValue::new(Some(&entry.val), Some(tuple))
                 }
             }
             Err(rid) => {
-                let tuple = self.inner.storage.get(rid);
+                let tuple = self.storage.get(rid);
                 QueryValue::new(None, Some(tuple))
             }
         }
@@ -98,19 +104,19 @@ where
         oid: &'b mut OidWriteGuard<'a>,
         query: &FieldsMeta<N>,
     ) -> QueryValue<'b, S::Field, S::Tuple, OidWriteGuard<'a>> {
-        match self.inner.read_and_promote(oid).await {
+        match self.inner.read_and_promote(oid, &self.storage).await {
             Ok(entry) => {
                 if self.inner.schema().matches(query) {
                     QueryValue::new(Some(&entry.val), None)
                 } else {
                     let rid = entry.rid();
                     counter!(Counter::ReadSchemaMiss, self.inner.metric_ctx);
-                    let tuple = self.inner.storage.get(rid);
+                    let tuple = self.storage.get(rid);
                     QueryValue::new(Some(&entry.val), Some(tuple))
                 }
             }
             Err(rid) => {
-                let tuple = self.inner.storage.get(rid);
+                let tuple = self.storage.get(rid);
                 QueryValue::new(None, Some(tuple))
             }
         }
