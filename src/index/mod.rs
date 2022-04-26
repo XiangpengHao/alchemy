@@ -1,6 +1,6 @@
 use crate::cache_manager::Rid;
-pub use con_art_rust;
-use con_art_rust::{Key, UsizeKey};
+pub use congee;
+use congee::epoch::Guard;
 pub use flurry;
 
 pub trait DbIndex: Send + Sync {
@@ -17,37 +17,41 @@ pub trait DbIndex: Send + Sync {
     fn with_capacity(cap: usize) -> Self;
 }
 
-pub struct Art(pub con_art_rust::Tree<UsizeKey>);
+pub struct Art(pub congee::ArtRaw<usize, Rid>);
 
 impl Art {
-    pub fn range(&self, low: usize, high: usize, out_buffer: &mut [usize]) -> Option<usize> {
-        self.0.look_up_range(
-            &UsizeKey::key_from(low),
-            &UsizeKey::key_from(high),
-            out_buffer,
-        )
+    pub fn range(
+        &self,
+        low: usize,
+        high: usize,
+        out_buffer: &mut [(usize, usize)],
+        guard: &Guard,
+    ) -> usize {
+        self.0.range(&low, &high, out_buffer, &guard)
     }
 }
 
 impl DbIndex for Art {
-    type Guard = con_art_rust::Epoch::Guard;
+    type Guard = congee::epoch::Guard;
 
+    #[inline]
     fn pin(&self) -> Self::Guard {
-        con_art_rust::Epoch::pin()
+        congee::epoch::pin()
     }
 
+    #[inline]
     fn insert(&self, key: usize, value: Rid, guard: &Self::Guard) {
-        self.0
-            .insert(UsizeKey::key_from(key), value.as_u32() as usize, guard);
+        self.0.insert(key, value, guard);
     }
 
+    #[inline]
     fn get<'a>(&'a self, key: &usize, guard: &'a Self::Guard) -> Option<Rid> {
-        let usize_v = self.0.get(&UsizeKey::key_from(*key), guard)?;
-        Some(Rid::from_u32(usize_v as u32))
+        let v = self.0.get(&key, guard)?;
+        Some(v)
     }
 
     fn new() -> Self {
-        Self(con_art_rust::Tree::new())
+        Self(congee::ArtRaw::new())
     }
 
     fn with_capacity(_cap: usize) -> Self {

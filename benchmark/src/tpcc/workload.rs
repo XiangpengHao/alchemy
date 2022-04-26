@@ -2,10 +2,7 @@ use std::{str::FromStr, time::SystemTime};
 
 use alchemy::{
     cache_manager::Schema,
-    index::{
-        con_art_rust::{self, Key, UsizeKey},
-        Art, DbIndex,
-    },
+    index::{congee, Art, DbIndex},
     table::DbTable,
 };
 
@@ -52,7 +49,7 @@ where
     pub(crate) stock: TpccTable<S>,
     pub(crate) order: TpccTable<O>,
     pub(crate) order_line: TpccTable<OL>,
-    pub(crate) new_order: con_art_rust::Tree<UsizeKey>, // new order doesn't need a table, the index contains everything
+    pub(crate) new_order: congee::ArtRaw<usize, usize>, // new order doesn't need a table, the index contains everything
 }
 
 impl<W, D, C, I, S, O, OL> TpccWorkload<W, D, C, I, S, O, OL>
@@ -170,7 +167,7 @@ where
             stock,
             c_last_idx: Art::new(),
             order_line,
-            new_order: con_art_rust::Tree::new(),
+            new_order: congee::ArtRaw::new(),
             order,
         }
     }
@@ -301,7 +298,7 @@ where
         d_id: u64,
         w_id: u64,
         customer_since: u64,
-        art_guard: &con_art_rust::Epoch::Guard,
+        art_guard: &congee::epoch::Guard,
     ) {
         let mut rng = thread_rng();
 
@@ -355,7 +352,7 @@ where
     pub fn reset_order(&mut self, _thread_cnt: usize) {
         self.order_line.reset();
         self.order.reset();
-        self.new_order = con_art_rust::Tree::new();
+        self.new_order = congee::ArtRaw::new();
 
         // use 32 threads to load
         let warehouse_per_thread = self.warehouse_cnt / 32;
@@ -461,8 +458,7 @@ where
             if o >= 2101 {
                 // insert to new order
                 let key = NewOrderTuple::make_key(w_id, d_id, o as u64, *o_c_id as u64);
-                self.new_order
-                    .insert(UsizeKey::key_from(key), key, &order_guard);
+                self.new_order.insert(key, key, &order_guard);
             }
         }
     }

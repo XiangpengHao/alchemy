@@ -20,6 +20,7 @@ use crate::{
         obj_alloc::{align_up, poison_memory_region, ArrayAllocator},
     },
 };
+use congee::epoch::Guard;
 use flurry::HashMap;
 use metric::CtxCounter;
 
@@ -145,11 +146,17 @@ impl<S> DbTable<Art, S>
 where
     S: Schema,
 {
-    pub fn range(&self, low: usize, high: usize, rid_buffer: &mut [Rid]) -> Option<usize> {
-        let mut range_buffer = vec![0; rid_buffer.len()];
-        let scanned = self.index.range(low, high, &mut range_buffer)?;
+    pub fn range(
+        &self,
+        low: usize,
+        high: usize,
+        rid_buffer: &mut [Rid],
+        guard: &Guard,
+    ) -> Option<usize> {
+        let mut range_buffer = vec![(0, 0); rid_buffer.len()];
+        let scanned = self.index.range(low, high, &mut range_buffer, guard);
         for (i, v) in range_buffer.iter().take(scanned).enumerate() {
-            rid_buffer[i] = Rid::from_u32(*v as u32);
+            rid_buffer[i] = Rid::from_u32(v.1 as u32);
         }
         Some(scanned)
     }

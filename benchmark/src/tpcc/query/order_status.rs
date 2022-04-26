@@ -88,17 +88,15 @@ where
 
                 // we currently allow 8 rid to be scanned, this should be enough because we expect to scan only 3 items
                 const RID_MAX_COUNT: usize = 8;
-                let mut rid_buffer = [0; RID_MAX_COUNT];
+                let mut rid_buffer = [(0, 0); RID_MAX_COUNT];
 
-                let middle_rid = match self.c_last_idx.range(low, high, &mut rid_buffer) {
-                    Some(cnt) => {
-                        histogram!(Histogram::PaymentCustomerScan, cnt as u64);
-                        Rid::from_u32(rid_buffer[cnt / 2] as u32)
-                    }
-                    None => {
-                        histogram!(Histogram::PaymentCustomerScan, 0);
-                        return Ok(());
-                    }
+                let cnt = self.c_last_idx.range(low, high, &mut rid_buffer, &guard);
+                let middle_rid = if cnt == 0 {
+                    histogram!(Histogram::PaymentCustomerScan, 0);
+                    return Ok(());
+                } else {
+                    histogram!(Histogram::PaymentCustomerScan, cnt as u64);
+                    Rid::from_u32(rid_buffer[cnt / 2].1 as u32)
                 };
 
                 self.customer
@@ -134,7 +132,7 @@ where
         );
         let mut rid_buffer = [Rid::from_u32(0); 12];
 
-        let scanned = self.order.range(order_low, order_high, &mut rid_buffer);
+        let scanned = self.order.range(order_low, order_high, &mut rid_buffer, &guard);
         let most_recent = match scanned {
             Some(cnt) => {
                 histogram!(Histogram::OSOrderScan, cnt as u64);
@@ -170,7 +168,7 @@ where
             u16::MAX as usize,
         );
 
-        let scanned = self.order_line.range(ol_low, ol_high, &mut rid_buffer);
+        let scanned = self.order_line.range(ol_low, ol_high, &mut rid_buffer, &guard);
         let cnt = match scanned {
             Some(cnt) => {
                 histogram!(Histogram::OrderLineScan, cnt as u64);

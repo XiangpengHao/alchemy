@@ -33,6 +33,20 @@ impl Rid {
     }
 }
 
+impl From<usize> for Rid {
+    #[inline]
+    fn from(id: usize) -> Self {
+        Rid::from_u32(id as u32)
+    }
+}
+
+impl From<Rid> for usize {
+    #[inline]
+    fn from(rid: Rid) -> Self {
+        rid.id as usize
+    }
+}
+
 pub struct QueryValue<'a, F, T: Tuple, L> {
     field: Option<&'a UnsafeCell<F>>,
     tuple: Option<&'a UnsafeCell<T>>,

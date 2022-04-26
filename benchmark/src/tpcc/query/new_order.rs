@@ -7,7 +7,6 @@ use alchemy::{
         Schema,
     },
     error::TransactionError,
-    index::con_art_rust::{Key, UsizeKey},
 };
 use rand::{prelude::SmallRng, thread_rng, Rng, SeedableRng};
 
@@ -201,8 +200,7 @@ where
             d_next_o_id,
             input.c_id as u64,
         );
-        self.new_order
-            .insert(UsizeKey::key_from(no_key), no_key, &art_guard);
+        self.new_order.insert(no_key, no_key, &art_guard);
 
         let order = OrderTuple {
             o_id: d_next_o_id,

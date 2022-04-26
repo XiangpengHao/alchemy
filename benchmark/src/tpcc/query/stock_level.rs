@@ -86,7 +86,7 @@ where
         let mut ol_rids = vec![Rid::from_u32(0); 128];
         let scanned = self
             .order_line
-            .range(ol_low, ol_high, &mut ol_rids)
+            .range(ol_low, ol_high, &mut ol_rids, &guard)
             .unwrap();
         histogram!(Histogram::OrderLineScan, scanned as u64);
 

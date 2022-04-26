@@ -3,7 +3,6 @@ use std::time::SystemTime;
 use alchemy::{
     cache_manager::{Rid, Schema},
     error::TransactionError,
-    index::con_art_rust::{Key, UsizeKey},
 };
 use metric::{histogram, Histogram};
 use rand::{thread_rng, Rng};
@@ -78,24 +77,19 @@ where
                 u16::MAX as u64,
             );
 
-            let mut out_buffer = [0; 1];
-            let scanned = self.new_order.look_up_range(
-                &UsizeKey::key_from(ol_key_low),
-                &UsizeKey::key_from(ol_key_high),
-                &mut out_buffer,
-            );
+            let mut out_buffer = [(0, 0); 1];
+            let scanned = self
+                .new_order
+                .range(&ol_key_low, &ol_key_high, &mut out_buffer, &guard);
 
-            match scanned {
-                Some(_cnt) => {
-                    self.new_order
-                        .remove(&UsizeKey::key_from(out_buffer[0]), &art_guard);
-                }
-                None => {
-                    metric::counter!(metric::Counter::DeliveryNewOrderNotFound, 1);
-                    return Ok(());
-                }
+            if scanned == 0 {
+                metric::counter!(metric::Counter::DeliveryNewOrderNotFound, 0);
+                return Ok(());
+            } else {
+                self.new_order.remove(&out_buffer[0].0, &art_guard);
             }
-            let (o_id, c_id) = NewOrderTuple::o_c_id_from_key(out_buffer[0]);
+
+            let (o_id, c_id) = NewOrderTuple::o_c_id_from_key(out_buffer[0].0);
 
             /* Read the oldest order */
             let order_key =
@@ -119,7 +113,7 @@ where
                 OrderLineTuple::make_key(input.w_id as usize, d_id, o_id, ITEM_SCALE as usize);
             let scanned = self
                 .order_line
-                .range(ol_low_key, ol_high_key, &mut rid_buffer)
+                .range(ol_low_key, ol_high_key, &mut rid_buffer, &guard)
                 .expect("failed to scan the order lines");
             histogram!(Histogram::OrderLineScan, scanned as u64);
 
