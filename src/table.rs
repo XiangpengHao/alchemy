@@ -12,7 +12,7 @@ use crate::{
     },
     error::TransactionError,
     index::{Art, DbIndex},
-    query::{FieldsMeta, UpdateQuery},
+    query::FieldsMeta,
     storage::pm_heap::PmHeap,
     utils::{
         get_tid,
@@ -268,15 +268,6 @@ where
         self.cache.write_lock_sync(idx)
     }
 
-    #[inline]
-    pub async fn update<'a, const N: usize>(
-        &'a self,
-        write_oid: &mut OidWriteGuard<'a>,
-        fields: UpdateQuery<'a, N>,
-    ) {
-        self.cache.update(write_oid, fields).await;
-    }
-
     pub fn schema(&self) -> &S {
         self.cache.schema()
     }
@@ -423,7 +414,7 @@ mod tests {
             TestGen,
         },
     };
-    use std::{mem, slice};
+    use std::mem;
 
     const FIELD_SZ: usize = 4;
     const TUPLE_SZ: usize = 16;
@@ -489,76 +480,6 @@ mod tests {
                 &query_miss,
                 &TestItem::<TUPLE_SZ>::from_increasing(i),
             );
-        }
-    }
-
-    #[test]
-    fn update_read() {
-        let record_cnt = 1000;
-        let storage_size = record_cnt * mem::size_of::<TestItem<TUPLE_SZ>>();
-        let cache_size = (record_cnt / 10) * mem::size_of::<TestItem<TUPLE_SZ>>();
-        let table = DbTable::<FlurryMap, FieldItemSchema<FIELD_SZ, TUPLE_SZ>>::builder()
-            .cache(cache_size)
-            .probe_len(Some(4))
-            .storage(storage_size)
-            .schema(TEST_SCHEMA)
-            .build();
-
-        let guard = table.pin();
-        for i in 0..record_cnt {
-            let item = TestItem::from_increasing(i);
-            let _x_guard = table.insert(item, &guard);
-        }
-
-        // Update cached fields
-        let query = TestItem::<TUPLE_SZ>::build_query([0, 3, 9]);
-        let query_data: [usize; 3] = [42, 42, 42];
-        let update = UpdateQuery::from_meta(query, unsafe {
-            slice::from_raw_parts(&query_data as *const usize as *const u8, 24)
-        });
-
-        for i in 0..record_cnt {
-            let key = i;
-            let mut write_oid = block_on(table.write_oid(&key, &guard)).unwrap();
-            block_on(table.update(&mut write_oid, update.clone()));
-        }
-
-        // Read back updated entries
-        let query = TestItem::<TUPLE_SZ>::build_query([0, 3, 9]);
-        for i in 0..record_cnt {
-            let key = i;
-            let oid_read = block_on(table.read_oid(&key, &guard)).unwrap();
-            let value = table.read(&oid_read, &query);
-
-            for q in query.iter() {
-                let qy_val = unsafe { value.get_value::<usize, _>(q, &TEST_SCHEMA) };
-                assert_eq!(*qy_val, 42);
-            }
-        }
-
-        // Update the uncached fields
-        let query = TestItem::<TUPLE_SZ>::build_query([1, 3, 10]);
-        let update_data: [usize; 3] = [24, 24, 24];
-        let update = UpdateQuery::from_meta(query, unsafe {
-            slice::from_raw_parts(&update_data as *const usize as *const u8, 24)
-        });
-
-        for i in 0..record_cnt {
-            let key = i;
-            let mut write_oid = block_on(table.write_oid(&key, &guard)).unwrap();
-            block_on(table.update(&mut write_oid, update.clone()));
-        }
-
-        let query = TestItem::<TUPLE_SZ>::build_query([1, 3, 10]);
-        for i in 0..record_cnt {
-            let key = i;
-            let oid_read = block_on(table.read_oid(&key, &guard)).unwrap();
-            let value = table.read(&oid_read, &query);
-
-            for q in query.iter() {
-                let qy_val = unsafe { value.get_value::<usize, _>(q, &TEST_SCHEMA) };
-                assert_eq!(*qy_val, 24);
-            }
         }
     }
 

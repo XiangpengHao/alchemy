@@ -1,8 +1,8 @@
 #![allow(clippy::question_mark)]
 use crate::{
     async_task::Prefetcher,
-    cache_manager::{QueryValue, Rid, Schema, Tuple},
-    query::{FieldsMeta, UpdateQuery},
+    cache_manager::{QueryValue, Rid, Schema},
+    query::FieldsMeta,
     storage::{oid_array::OidArray, Storage},
 };
 use metric::{counter, histogram, Counter, CtxCounter, Histogram};
@@ -209,78 +209,6 @@ impl<S: Schema> CacheInner<S> {
             None
         } else {
             Some(unsafe { &*self.get_entry(index).val.get() })
-        }
-    }
-
-    fn update_schema_miss<'a, const N: usize>(
-        &self,
-        oid: &mut OidWriteGuard<'a>,
-        fields: UpdateQuery<'a, N>,
-    ) {
-        counter!(Counter::UpdateSchemaMiss);
-
-        // Note that we are holding the oid write lock, no one is going to contend with us
-        // If schema miss, we just update the storage and rebuild the cached item (if necessary)
-        if oid.is_rid() {
-            counter!(Counter::UpdateMiss);
-            let rid = oid.to_rid();
-            let tuple = self.storage().get_mut(&rid);
-
-            tuple.update(fields);
-        } else if oid.is_cached() {
-            counter!(Counter::UpdateHit);
-            let index = oid.to_cached();
-            let entry = self.get_entry_mut(index);
-
-            let tuple = self.storage().get_mut(&entry.rid());
-
-            tuple.update(fields);
-            entry.val = UnsafeCell::new(self.schema.to_cached(tuple));
-        } else {
-            unreachable!();
-        }
-    }
-
-    pub async fn update<'a, const N: usize>(
-        &'a self,
-        oid: &mut OidWriteGuard<'a>,
-        fields: UpdateQuery<'a, N>,
-    ) {
-        counter!(Counter::UpdateCnt);
-
-        if !self.schema.matches(fields.meta()) {
-            return self.update_schema_miss(oid, fields);
-        }
-
-        // Schema hit
-        if oid.is_cached() {
-            counter!(Counter::UpdateHit);
-            let index = oid.to_cached();
-            let entry = self.get_entry_mut(index);
-
-            Prefetcher::fetch(entry).await;
-
-            self.schema.update_cached(entry.val.get_mut(), fields);
-            entry.meta.set_dirty();
-            entry.set_ref(self.probe_rng);
-        } else if oid.is_rid() {
-            counter!(Counter::UpdateMiss);
-            let tuple_rid = oid.to_rid();
-            let tuple = self.storage().get_mut(&tuple_rid);
-
-            Prefetcher::fetch(tuple).await;
-
-            tuple.update(fields);
-
-            // early return for direct access
-            if self.probe_len == 0 {
-                return;
-            }
-
-            let cached_item = self.schema.to_cached(tuple);
-            let new_node = ClockNode::new(cached_item, tuple_rid);
-
-            self.probe_and_replace_rng(new_node, tuple_rid, oid, self.probe_rng as f64);
         }
     }
 

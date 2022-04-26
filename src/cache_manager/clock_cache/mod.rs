@@ -5,11 +5,7 @@ pub mod oid;
 #[cfg(test)]
 mod tests;
 
-use crate::{
-    cache_manager::Rid,
-    error::TransactionError,
-    query::{FieldsMeta, UpdateQuery},
-};
+use crate::{cache_manager::Rid, error::TransactionError, query::FieldsMeta};
 
 use super::{QueryValue, Schema};
 use cache_inner::CacheInner;
@@ -102,15 +98,5 @@ where
     pub fn write_lock_sync(&self, rid: Rid) -> Result<OidWriteGuard<'_>, TransactionError> {
         let ptr = self.inner.oid_array.get_sync(rid);
         ptr.try_write()
-    }
-
-    // Update should never switch to other threads, because prefetching only work for read
-    #[inline]
-    pub async fn update<'a, const N: usize>(
-        &'a self,
-        write_lock: &mut OidWriteGuard<'a>,
-        fields: UpdateQuery<'a, N>,
-    ) {
-        self.inner.update(write_lock, fields).await;
     }
 }
