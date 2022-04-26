@@ -11,7 +11,7 @@ use self::oid::OidGuard;
 
 use super::{QueryValue, Schema};
 use cache_inner::CacheInner;
-use metric::CtxCounter;
+use metric::{counter, Counter, CtxCounter};
 
 use oid::{OidReadGuard, OidWriteGuard};
 
@@ -80,6 +80,7 @@ where
                 if self.inner.schema().matches(query) {
                     QueryValue::new(Some(&entry.val), None)
                 } else {
+                    counter!(Counter::ReadSchemaMiss, self.inner.metric_ctx);
                     let rid = entry.rid();
                     let tuple = self.inner.storage.get(rid);
                     QueryValue::new(Some(&entry.val), Some(tuple))
@@ -97,7 +98,22 @@ where
         oid: &'b mut OidWriteGuard<'a>,
         query: &FieldsMeta<N>,
     ) -> QueryValue<'b, S::Field, S::Tuple, OidWriteGuard<'a>> {
-        self.inner.read_and_promote(oid, query).await
+        match self.inner.read_and_promote(oid).await {
+            Ok(entry) => {
+                if self.inner.schema().matches(query) {
+                    QueryValue::new(Some(&entry.val), None)
+                } else {
+                    let rid = entry.rid();
+                    counter!(Counter::ReadSchemaMiss, self.inner.metric_ctx);
+                    let tuple = self.inner.storage.get(rid);
+                    QueryValue::new(Some(&entry.val), Some(tuple))
+                }
+            }
+            Err(rid) => {
+                let tuple = self.inner.storage.get(rid);
+                QueryValue::new(None, Some(tuple))
+            }
+        }
     }
 
     #[inline]

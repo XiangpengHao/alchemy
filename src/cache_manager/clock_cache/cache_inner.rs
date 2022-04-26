@@ -1,8 +1,7 @@
 #![allow(clippy::question_mark)]
 use crate::{
     async_task::Prefetcher,
-    cache_manager::{QueryValue, Rid, Schema},
-    query::FieldsMeta,
+    cache_manager::{Rid, Schema},
     storage::{oid_array::OidArray, Storage},
 };
 use metric::{counter, histogram, Counter, CtxCounter, Histogram};
@@ -67,7 +66,7 @@ where
     probe_len: u32,
     probe_rng: f32,
     hotness_threshold: u32,
-    metric_ctx: Option<CtxCounter>,
+    pub(super) metric_ctx: Option<CtxCounter>,
     schema: S,
     tls_index: ThreadLocal<AtomicU32>,
     pub(super) storage: Storage<S::Tuple>,
@@ -305,11 +304,10 @@ impl<S: Schema> CacheInner<S> {
     }
 
     /// Read with exclusive lock
-    pub(super) async fn read_and_promote<'a: 'b, 'b, const N: usize>(
+    pub(super) async fn read_and_promote<'a: 'b, 'b>(
         &'a self,
         oid: &'b mut OidWriteGuard<'a>,
-        query: &FieldsMeta<N>,
-    ) -> QueryValue<'b, S::Field, S::Tuple, OidWriteGuard<'a>> {
+    ) -> Result<&'a ClockNode<S::Field>, Rid> {
         counter!(Counter::ReadCnt, self.metric_ctx);
 
         let cache_idx = self.promote_entry(oid).await;
@@ -319,22 +317,9 @@ impl<S: Schema> CacheInner<S> {
                 let entry = self.get_entry(idx);
 
                 entry.set_ref(self.probe_rng);
-
-                if self.schema.matches(query) {
-                    QueryValue::new(Some(&entry.val), None)
-                } else {
-                    counter!(Counter::ReadSchemaMiss, self.metric_ctx);
-                    let storage_rid = entry.rid();
-                    let tuple = self.storage.get(storage_rid);
-
-                    QueryValue::new(Some(&entry.val), Some(tuple))
-                }
+                Ok(entry)
             }
-            None => {
-                // Can't find an empty slot, just return the nvm value.
-                let tuple = self.storage.get(oid.to_rid());
-                QueryValue::new(None, Some(tuple))
-            }
+            None => Err(oid.to_rid()),
         }
     }
 

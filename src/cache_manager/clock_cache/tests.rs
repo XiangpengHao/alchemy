@@ -1,3 +1,4 @@
+use crate::cache_manager::Schema;
 use crate::utils::test_gen::{value_compare, FieldItemSchema, TestItem};
 use crate::{
     async_task::block_on,
@@ -13,7 +14,11 @@ const QUERY: FieldsMeta<4> = FieldsMeta::new([
     Field::new(72, 80),
     Field::new(80, 88),
 ]);
-type CacheSchema = FieldItemSchema<4, 16>;
+
+const TUPLE_SZ: usize = 16;
+const FIELD_SZ: usize = 4;
+type CacheSchema = FieldItemSchema<FIELD_SZ, TUPLE_SZ>;
+
 const TEST_SCHEMA: CacheSchema = FieldItemSchema::from_fields(QUERY.fields);
 
 const PROBE_LEN: usize = 16;
@@ -28,10 +33,10 @@ fn clock_insert() {
     // Read the first few items without touching the cache manager
     // the first few items should be pointers
     for (i, rid) in rid_array.iter().enumerate().take(item_cnt - capacity) {
-        let cur_oid = block_on(cache.oid_array.get(*rid)).read();
+        let cur_oid = block_on(cache.inner.oid_array.get(*rid)).read();
         if cur_oid.is_rid() {
             let p = cur_oid.to_rid();
-            let storage_p = unsafe { &*cache.storage.get(p).get() };
+            let storage_p = unsafe { &*cache.inner.storage.get(p).get() };
             let item = storage_p.clone();
             assert_eq!(item, TestItem::from_increasing(i));
         } else {
@@ -42,7 +47,7 @@ fn clock_insert() {
     // Reference the last few items so their hotness are incremented
     // The last few items should hit cache
     for (i, rid) in rid_array.iter().enumerate().skip(item_cnt - capacity) {
-        let mut locked_oid = block_on(cache.oid_array.get(*rid)).write();
+        let mut locked_oid = block_on(cache.inner.oid_array.get(*rid)).write();
         let qy_rt = block_on(cache.read_and_promote(&mut locked_oid, &QUERY));
         assert!(qy_rt.cached_hit());
         assert!(!qy_rt.has_tuple());
@@ -58,9 +63,9 @@ fn clock_insert() {
     for (i, rid) in rid_array
         .iter()
         .enumerate()
-        .take(capacity / cache.probe_len())
+        .take(capacity / cache.inner.probe_len())
     {
-        let mut locked_oid = cache.oid_array.get_sync(*rid).write();
+        let mut locked_oid = cache.inner.oid_array.get_sync(*rid).write();
         let val = block_on(cache.read_and_promote(&mut locked_oid, &QUERY));
 
         // The return value should be newly promoted to cache
@@ -75,7 +80,7 @@ fn clock_insert() {
 
     // Now flooding the cache, every one should be a cache miss and be promoted to cache
     for (i, rid) in rid_array.iter().enumerate().take(capacity) {
-        let mut locked_oid = cache.oid_array.get_sync(*rid).write();
+        let mut locked_oid = cache.inner.oid_array.get_sync(*rid).write();
         let val = block_on(cache.read_and_promote(&mut locked_oid, &QUERY));
 
         // The return value should be newly promoted to cache
@@ -97,22 +102,7 @@ fn clock_multi_read() {
     let item_cnt = 1000;
     let capacity = 100;
 
-    let cache = CacheInner::<FieldItemSchema<FIELD_SZ, TUPLE_SZ>>::new_cap(
-        capacity,
-        PROBE_LEN,
-        0.1,
-        item_cnt,
-        0,
-        TEST_SCHEMA,
-        None,
-    );
-    let mut rid_array = Vec::new();
-    for i in 0..item_cnt {
-        let (rid, _write_lock) = cache.oid_array.alloc_rid();
-        let item = TestItem::from_increasing(i);
-        cache.storage.insert(&rid, item);
-        rid_array.push(rid);
-    }
+    let (cache, rid_array) = gen_cache_and_oid(capacity, item_cnt);
 
     const THREADS: usize = 8;
     const READ_CNT: usize = 10000;
@@ -123,7 +113,7 @@ fn clock_multi_read() {
                 for _i in 0..READ_CNT {
                     let idx = rng.gen_range(0..item_cnt);
                     let rid = rid_array[idx];
-                    let mut locked_oid = cache.oid_array.get_sync(rid).write();
+                    let mut locked_oid = cache.inner.oid_array.get_sync(rid).write();
                     let val = block_on(cache.read_and_promote(&mut locked_oid, &QUERY));
                     assert!(value_compare(
                         &val,
@@ -141,10 +131,9 @@ fn clock_multi_read() {
 use crossbeam_utils::Backoff;
 use std::sync::Arc;
 
-use super::{cache_inner::CacheInner, oid::OidGuard};
-
-const TUPLE_SZ: usize = 16;
-const FIELD_SZ: usize = 4;
+use super::cache_inner::ClockNode;
+use super::oid::OidGuard;
+use super::ClockCache;
 
 #[test]
 fn clock_multi_insert() {
@@ -152,31 +141,17 @@ fn clock_multi_insert() {
     const ITEM_PER_THREAD: usize = 1000;
 
     let capacity = 100;
-    let cache = CacheInner::<FieldItemSchema<FIELD_SZ, TUPLE_SZ>>::new_cap(
-        capacity,
-        PROBE_LEN,
-        0.1,
-        THREADS * ITEM_PER_THREAD,
-        0,
-        TEST_SCHEMA,
-        None,
-    );
+
+    let (cache, rid_array) = gen_cache_and_oid(capacity, ITEM_PER_THREAD * THREADS);
 
     let remaining = Arc::new(AtomicUsize::new(THREADS));
     scope(|scope| {
         for _tid in 0..THREADS {
             scope.spawn(|_| {
-                let mut rid_array = Vec::new();
                 let rm = remaining.clone();
-                for i in 0..ITEM_PER_THREAD {
-                    let (rid, mut write_lock) = cache.oid_array.alloc_rid();
-                    let item = TestItem::from_increasing(i);
-                    cache.insert(&mut write_lock, item);
-                    rid_array.push(rid);
-                }
 
                 for (i, item) in rid_array.iter().enumerate().take(ITEM_PER_THREAD) {
-                    let mut locked_oid = cache.oid_array.get_sync(*item).write();
+                    let mut locked_oid = cache.inner.oid_array.get_sync(*item).write();
                     let val = block_on(cache.read_and_promote(&mut locked_oid, &QUERY));
                     assert!(value_compare(
                         &val,
@@ -203,25 +178,16 @@ fn clock_multi_insert() {
     .unwrap();
 }
 
-fn gen_cache_and_oid(
-    cache_cnt: usize,
-    tuple_cnt: usize,
-) -> (CacheInner<FieldItemSchema<4, 16>>, Vec<Rid>) {
-    let cache = CacheInner::<FieldItemSchema<FIELD_SZ, TUPLE_SZ>>::new_cap(
-        cache_cnt,
-        PROBE_LEN,
-        1.0,
-        tuple_cnt,
-        0,
-        TEST_SCHEMA,
-        None,
-    );
+fn gen_cache_and_oid(cache_cnt: usize, tuple_cnt: usize) -> (ClockCache<CacheSchema>, Vec<Rid>) {
+    let cache_size = cache_cnt * std::mem::size_of::<ClockNode<<CacheSchema as Schema>::Field>>();
+    let storage_size = tuple_cnt * std::mem::size_of::<<CacheSchema as Schema>::Tuple>();
+    let cache =
+        ClockCache::<CacheSchema>::new(cache_size, PROBE_LEN, 1.0, storage_size, TEST_SCHEMA, None);
     let mut rid_array = Vec::with_capacity(tuple_cnt);
     for i in 0..tuple_cnt {
-        let (rid, mut write_lock) = cache.oid_array.alloc_rid();
-        rid_array.push(rid);
         let item = TestItem::from_increasing(i);
-        cache.insert(&mut write_lock, item);
+        let (rid, _) = cache.insert(item);
+        rid_array.push(rid);
     }
     (cache, rid_array)
 }
