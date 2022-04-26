@@ -142,24 +142,23 @@ impl<F> CacheInner<F> {
         });
     }
 
-    pub(crate) fn insert<'a, SC: Schema<Field = F, Tuple = T>, T>(
+    pub(crate) fn insert<'a>(
         &'a self,
         lock: &mut OidWriteGuard<'a>,
         val: F,
-        storage: &Storage<T>,
-        oid_array: &OidArray,
-        schema: &SC,
-    ) {
+        oid_array: &'a OidArray,
+    ) -> Option<(ClockNode<F>, OidWriteGuard<'a>)> {
         assert!(lock.is_rid());
         let rid = lock.to_rid();
 
         let clock_node = ClockNode::new(val, rid);
 
-        let _index =
-            self.probe_and_replace_rng(clock_node, rid, lock, 1.0, storage, oid_array, schema);
+        let index = self.probe_and_replace_rng(clock_node, rid, lock, 1.0, oid_array)?;
+        index.1
     }
 
     /// returns new index
+    #[inline]
     fn advance_index(&self) -> usize {
         let index = (self.get_index() + 1) % self.capacity();
         let idx = self.tls_index.get().unwrap();
@@ -167,18 +166,16 @@ impl<F> CacheInner<F> {
         index
     }
 
-    /// Replace a old clock node with the new ones based on random probability
-    /// return the new index if find a node within probe length
-    fn probe_and_replace_rng<'a, SC: Schema<Field = F, Tuple = T>, T>(
+    /// Replace a old clock node with the new ones based on probability
+    /// if find a node within probe length, return the new index as well as the old node
+    fn probe_and_replace_rng<'a>(
         &'a self,
         new_node: ClockNode<F>,
         rid: Rid,
         oid: &mut OidWriteGuard<'a>,
         probability: f64,
-        storage: &Storage<T>,
-        oid_array: &OidArray,
-        schema: &SC,
-    ) -> Option<usize> {
+        oid_array: &'a OidArray,
+    ) -> Option<(usize, Option<(ClockNode<F>, OidWriteGuard<'a>)>)> {
         if !rand::thread_rng().gen_bool(probability) {
             return None;
         }
@@ -186,12 +183,12 @@ impl<F> CacheInner<F> {
         for p in 0..self.probe_len {
             let cur_index = self.advance_index();
             let cur_entry = self.get_entry_mut(cur_index);
-            let cur_origin = cur_entry.rid.load(Ordering::Relaxed);
+            let cur_rid = cur_entry.rid.load(Ordering::Relaxed);
 
-            if cur_origin == u32::MAX {
+            if cur_rid == u32::MAX {
                 // Validate phase
                 match cur_entry.rid.compare_exchange_weak(
-                    cur_origin,
+                    cur_rid,
                     rid.as_u32(),
                     Ordering::Relaxed,
                     Ordering::Relaxed,
@@ -200,7 +197,7 @@ impl<F> CacheInner<F> {
                         *cur_entry = new_node;
                         oid.store_index(cur_index);
                         histogram!(Histogram::ProbeLen, p as u64);
-                        return Some(cur_index);
+                        return Some((cur_index, None));
                     }
                     Err(_v) => continue,
                 }
@@ -209,9 +206,9 @@ impl<F> CacheInner<F> {
                     continue;
                 }
 
-                let cur_rid = Rid::from_u32(cur_origin);
-                let cur_oid = oid_array.get_sync(cur_rid);
-                let oid_to_evict = cur_oid.try_write();
+                let cur_rid = Rid::from_u32(cur_rid);
+                let entry_oid = oid_array.get_sync(cur_rid);
+                let oid_to_evict = entry_oid.try_write();
                 if oid_to_evict.is_err() {
                     continue;
                 }
@@ -220,8 +217,8 @@ impl<F> CacheInner<F> {
                 if cur_entry
                     .rid
                     .compare_exchange_weak(
-                        cur_origin,
-                        cur_origin,
+                        cur_rid.as_u32(),
+                        cur_rid.as_u32(),
                         Ordering::Relaxed,
                         Ordering::Relaxed,
                     )
@@ -233,16 +230,12 @@ impl<F> CacheInner<F> {
                 let oid_to_evict = oid_to_evict.unwrap();
                 oid_to_evict.store_rid(&cur_entry.rid());
 
-                // when _old goes out of scope, the drop will persist the node if it's dirty
                 let old = mem::replace(self.get_entry_mut(cur_index), new_node);
-                let tuple = storage.get_mut(&old.rid());
-
-                schema.write_back(unsafe { &*old.val.get() }, tuple);
-
-                oid.store_index(cur_index);
 
                 histogram!(Histogram::ProbeLen, p as u64);
-                return Some(cur_index);
+                oid.store_index(cur_index);
+
+                return Some((cur_index, Some((old, oid_to_evict))));
             }
         }
         counter!(Counter::ProbeMiss, self.metric_ctx);
@@ -253,12 +246,12 @@ impl<F> CacheInner<F> {
         &'a self,
         oid: &mut OidWriteGuard<'a>,
         storage: &Storage<T>,
-        oid_array: &OidArray,
+        oid_array: &'a OidArray,
         schema: &SC,
-    ) -> Option<usize> {
+    ) -> Option<(usize, Option<(ClockNode<F>, OidWriteGuard<'a>)>)> {
         if oid.is_cached() {
             counter!(Counter::ReadHit, self.metric_ctx);
-            return Some(oid.to_cache_index());
+            return Some((oid.to_cache_index(), None));
         }
 
         // We now hit a cache miss and prefetch the data on NVM
@@ -278,15 +271,7 @@ impl<F> CacheInner<F> {
         let cached_item = schema.to_cached(unsafe { &*tuple.get() });
         let new_node = ClockNode::new(cached_item, tuple_rid);
 
-        self.probe_and_replace_rng(
-            new_node,
-            tuple_rid,
-            oid,
-            self.probe_rng as f64,
-            storage,
-            oid_array,
-            schema,
-        )
+        self.probe_and_replace_rng(new_node, tuple_rid, oid, self.probe_rng as f64, oid_array)
     }
 
     /// Read with exclusive lock
@@ -294,19 +279,19 @@ impl<F> CacheInner<F> {
         &'a self,
         oid: &'b mut OidWriteGuard<'a>,
         storage: &Storage<T>,
-        oid_array: &OidArray,
+        oid_array: &'a OidArray,
         schema: &SC,
-    ) -> Result<&'a ClockNode<F>, Rid> {
+    ) -> Result<(&'a ClockNode<F>, Option<(ClockNode<F>, OidWriteGuard<'a>)>), Rid> {
         counter!(Counter::ReadCnt, self.metric_ctx);
 
         let cache_idx = self.promote_entry(oid, storage, oid_array, schema).await;
 
         match cache_idx {
-            Some(idx) => {
+            Some((idx, old_node)) => {
                 let entry = self.get_entry(idx);
 
                 entry.set_ref(self.probe_rng);
-                Ok(entry)
+                Ok((entry, old_node))
             }
             None => Err(oid.to_rid()),
         }

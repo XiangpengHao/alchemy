@@ -76,13 +76,16 @@ where
         counter!(Counter::InsertCnt, self.inner.metric_ctx);
         let (rid, mut write_guard) = self.oid_array.alloc_rid();
         let cached_item = self.schema.to_cached(&val);
-        self.inner.insert(
-            &mut write_guard,
-            cached_item,
-            &self.storage,
-            &self.oid_array,
-            &self.schema,
-        );
+        let evicted = self
+            .inner
+            .insert(&mut write_guard, cached_item, &self.oid_array);
+
+        if let Some(evicted) = evicted {
+            let tuple = self.storage.get_mut(&evicted.0.rid());
+            self.schema
+                .write_back(unsafe { &*evicted.0.val.get() }, tuple);
+        }
+
         self.storage.insert(&rid, val);
 
         (rid, write_guard)
@@ -124,7 +127,13 @@ where
             .read_and_promote(oid, &self.storage, &self.oid_array, &self.schema)
             .await
         {
-            Ok(entry) => {
+            Ok((entry, evicted)) => {
+                if let Some(evicted) = evicted {
+                    let tuple = self.storage.get_mut(&evicted.0.rid());
+                    self.schema
+                        .write_back(unsafe { &*evicted.0.val.get() }, tuple);
+                }
+
                 if self.schema.matches(query) {
                     QueryValue::new(Some(&entry.val), None)
                 } else {
