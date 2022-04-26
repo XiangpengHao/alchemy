@@ -33,7 +33,7 @@ fn clock_insert() {
     // Read the first few items without touching the cache manager
     // the first few items should be pointers
     for (i, rid) in rid_array.iter().enumerate().take(item_cnt - capacity) {
-        let cur_oid = block_on(cache.inner.oid_array.get(*rid)).read();
+        let cur_oid = block_on(cache.oid_array.get(*rid)).read();
         if cur_oid.is_rid() {
             let p = cur_oid.to_rid();
             let storage_p = unsafe { &*cache.storage.get(p).get() };
@@ -47,7 +47,7 @@ fn clock_insert() {
     // Reference the last few items so their hotness are incremented
     // The last few items should hit cache
     for (i, rid) in rid_array.iter().enumerate().skip(item_cnt - capacity) {
-        let mut locked_oid = block_on(cache.inner.oid_array.get(*rid)).write();
+        let mut locked_oid = block_on(cache.oid_array.get(*rid)).write();
         let qy_rt = block_on(cache.read_and_promote(&mut locked_oid, &QUERY));
         assert!(qy_rt.cached_hit());
         assert!(!qy_rt.has_tuple());
@@ -65,7 +65,7 @@ fn clock_insert() {
         .enumerate()
         .take(capacity / cache.inner.probe_len())
     {
-        let mut locked_oid = cache.inner.oid_array.get_sync(*rid).write();
+        let mut locked_oid = cache.oid_array.get_sync(*rid).write();
         let val = block_on(cache.read_and_promote(&mut locked_oid, &QUERY));
 
         // The return value should be newly promoted to cache
@@ -80,7 +80,7 @@ fn clock_insert() {
 
     // Now flooding the cache, every one should be a cache miss and be promoted to cache
     for (i, rid) in rid_array.iter().enumerate().take(capacity) {
-        let mut locked_oid = cache.inner.oid_array.get_sync(*rid).write();
+        let mut locked_oid = cache.oid_array.get_sync(*rid).write();
         let val = block_on(cache.read_and_promote(&mut locked_oid, &QUERY));
 
         // The return value should be newly promoted to cache
@@ -113,7 +113,7 @@ fn clock_multi_read() {
                 for _i in 0..READ_CNT {
                     let idx = rng.gen_range(0..item_cnt);
                     let rid = rid_array[idx];
-                    let mut locked_oid = cache.inner.oid_array.get_sync(rid).write();
+                    let mut locked_oid = cache.oid_array.get_sync(rid).write();
                     let val = block_on(cache.read_and_promote(&mut locked_oid, &QUERY));
                     assert!(value_compare(
                         &val,
@@ -151,7 +151,7 @@ fn clock_multi_insert() {
                 let rm = remaining.clone();
 
                 for (i, item) in rid_array.iter().enumerate().take(ITEM_PER_THREAD) {
-                    let mut locked_oid = cache.inner.oid_array.get_sync(*item).write();
+                    let mut locked_oid = cache.oid_array.get_sync(*item).write();
                     let val = block_on(cache.read_and_promote(&mut locked_oid, &QUERY));
                     assert!(value_compare(
                         &val,

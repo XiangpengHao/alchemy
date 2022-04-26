@@ -65,14 +65,11 @@ where
     capacity: u32,
     probe_len: u32,
     probe_rng: f32,
-    hotness_threshold: u32,
     pub(super) metric_ctx: Option<CtxCounter>,
     schema: S,
     tls_index: ThreadLocal<AtomicU32>,
-    pub(super) oid_array: OidArray,
     entries: *mut ClockNode<S::Field>,
 }
-
 
 impl<S: Schema> Drop for CacheInner<S> {
     fn drop(&mut self) {
@@ -97,8 +94,6 @@ impl<S: Schema> CacheInner<S> {
         cache_cnt: usize,
         probe_len: usize,
         probe_rng: f32,
-        tuple_cnt: usize,
-        hotness_threshold: u32,
         schema: S,
         metric_ctx: Option<CtxCounter>,
     ) -> Self {
@@ -114,16 +109,13 @@ impl<S: Schema> CacheInner<S> {
             let cur_entry = unsafe { &mut *entries.add(i) };
             cur_entry.rid = AtomicU32::new(u32::MAX);
         }
-        let oid_array = OidArray::new(tuple_cnt);
 
         CacheInner {
             entries,
-            oid_array,
             tls_index: ThreadLocal::new(),
             capacity: cache_cnt as u32,
             probe_len: probe_len as u32,
             probe_rng,
-            hotness_threshold,
             schema,
             metric_ctx,
         }
@@ -131,8 +123,6 @@ impl<S: Schema> CacheInner<S> {
 
     /// To reset the oid to 0, this is for benchmark only
     pub fn reset(&mut self) {
-        println!("resetting the table...");
-        self.oid_array.reset();
         for i in 0..self.capacity as usize {
             let cur_entry = unsafe { &mut *self.entries.add(i) };
             cur_entry.rid = AtomicU32::new(u32::MAX);
@@ -143,19 +133,14 @@ impl<S: Schema> CacheInner<S> {
         cache_size: usize,
         probe_rng: f32,
         probe_len: usize,
-        storage_size: usize,
-        hotness_threshold: u32,
         schema: S,
         metric_ctx: Option<CtxCounter>,
     ) -> Self {
         let cap = cache_size / mem::size_of::<ClockNode<S::Field>>();
-        let storage_cap = storage_size / mem::size_of::<S::Tuple>();
         CacheInner::new_cap(
             cap,
             probe_len,
             probe_rng,
-            storage_cap,
-            hotness_threshold,
             schema,
             metric_ctx,
         )
@@ -177,6 +162,7 @@ impl<S: Schema> CacheInner<S> {
         lock: &mut OidWriteGuard<'a>,
         val: &S::Tuple,
         storage: &Storage<S::Tuple>,
+        oid_array: &OidArray,
     ) {
         assert!(lock.is_rid());
         let rid = lock.to_rid();
@@ -185,7 +171,7 @@ impl<S: Schema> CacheInner<S> {
 
         let clock_node = ClockNode::new(cached_item, rid);
 
-        let _index = self.probe_and_replace_rng(clock_node, rid, lock, 1.0, storage);
+        let _index = self.probe_and_replace_rng(clock_node, rid, lock, 1.0, storage, oid_array);
     }
 
     /// returns new index
@@ -205,6 +191,7 @@ impl<S: Schema> CacheInner<S> {
         oid: &mut OidWriteGuard<'a>,
         probability: f64,
         storage: &Storage<S::Tuple>,
+        oid_array: &OidArray,
     ) -> Option<usize> {
         if !rand::thread_rng().gen_bool(probability) {
             return None;
@@ -237,7 +224,7 @@ impl<S: Schema> CacheInner<S> {
                 }
 
                 let cur_rid = Rid::from_u32(cur_origin);
-                let cur_oid = self.oid_array.get_sync(cur_rid);
+                let cur_oid = oid_array.get_sync(cur_rid);
                 let oid_to_evict = cur_oid.try_write();
                 if oid_to_evict.is_err() {
                     continue;
@@ -276,6 +263,7 @@ impl<S: Schema> CacheInner<S> {
         &'a self,
         oid: &mut OidWriteGuard<'a>,
         storage: &Storage<S::Tuple>,
+        oid_array: &OidArray,
     ) -> Option<usize> {
         if oid.is_cached() {
             counter!(Counter::ReadHit, self.metric_ctx);
@@ -299,7 +287,14 @@ impl<S: Schema> CacheInner<S> {
         let cached_item = self.schema.to_cached(unsafe { &*tuple.get() });
         let new_node = ClockNode::new(cached_item, tuple_rid);
 
-        self.probe_and_replace_rng(new_node, tuple_rid, oid, self.probe_rng as f64, storage)
+        self.probe_and_replace_rng(
+            new_node,
+            tuple_rid,
+            oid,
+            self.probe_rng as f64,
+            storage,
+            oid_array,
+        )
     }
 
     /// Read with exclusive lock
@@ -307,10 +302,11 @@ impl<S: Schema> CacheInner<S> {
         &'a self,
         oid: &'b mut OidWriteGuard<'a>,
         storage: &Storage<S::Tuple>,
+        oid_array: &OidArray,
     ) -> Result<&'a ClockNode<S::Field>, Rid> {
         counter!(Counter::ReadCnt, self.metric_ctx);
 
-        let cache_idx = self.promote_entry(oid, storage).await;
+        let cache_idx = self.promote_entry(oid, storage, oid_array).await;
 
         match cache_idx {
             Some(idx) => {
