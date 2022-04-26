@@ -21,7 +21,7 @@ use std::{
     sync::{atomic::AtomicUsize, Arc},
 };
 
-use alchemy::{block_on, attribute_cache::Schema, error::TransactionError, log::Logger, Executor};
+use alchemy::{attribute_cache::Schema, block_on, error::TransactionError, log::Logger, Executor};
 
 use metric::{counter, timer};
 use serde_json::{json, Value};

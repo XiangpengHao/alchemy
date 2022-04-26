@@ -164,6 +164,7 @@ impl<F> CacheInner<F> {
 
     /// Replace a old clock node with the new ones based on probability
     /// if find a node within probe length, return the new index as well as the old node
+    #[allow(clippy::type_complexity)]
     pub(super) fn probe_and_replace_rng<'a>(
         &'a self,
         new_node: ClockNode<F>,

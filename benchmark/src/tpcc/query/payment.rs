@@ -15,8 +15,8 @@ use bincode::Encode;
 use metric::{histogram, Histogram};
 
 use alchemy::{
-    block_on,
     attribute_cache::{Rid, Schema},
+    block_on,
     error::TransactionError,
 };
 use rand::{prelude::SmallRng, thread_rng, Rng, SeedableRng};

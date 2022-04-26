@@ -166,15 +166,15 @@ where
             }
 
             if self.schema.matches(query) {
-                return QueryValue::new(Some(&entry.val), None);
+                QueryValue::new(Some(&entry.val), None)
             } else {
                 counter!(Counter::ReadSchemaMiss, self.inner.metric_ctx);
                 let rid = entry.rid();
                 let tuple = self.storage.get(rid);
-                return QueryValue::new(Some(&entry.val), Some(tuple));
+                QueryValue::new(Some(&entry.val), Some(tuple))
             }
         } else {
-            return QueryValue::new(None, Some(tuple));
+            QueryValue::new(None, Some(tuple))
         }
     }
 

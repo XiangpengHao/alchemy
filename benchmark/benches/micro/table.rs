@@ -7,8 +7,8 @@ use benchmark::{
 };
 
 use alchemy::{
-    block_on,
     attribute_cache::Schema,
+    block_on,
     index::{Art, DbIndex},
     log::{start_logger_thread, Logger},
     query::{Field, FieldsMeta},
