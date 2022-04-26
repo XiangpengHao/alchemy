@@ -1,8 +1,4 @@
-use crate::{
-    async_task::Prefetcher,
-    attribute_cache::{Rid, Schema},
-    storage::{oid_array::OidArray, Storage},
-};
+use crate::{attribute_cache::Rid, storage::oid_array::OidArray};
 use metric::{counter, histogram, Counter, CtxCounter, Histogram};
 
 use rand::Rng;
@@ -30,7 +26,7 @@ pub(crate) struct ClockNode<T> {
 }
 
 impl<T> ClockNode<T> {
-    fn new(val: T, rid: Rid) -> Self {
+    pub(super) fn new(val: T, rid: Rid) -> Self {
         Self {
             rid: AtomicU32::new(rid.as_u32()),
             meta: NodeMeta::new(),
@@ -44,7 +40,7 @@ impl<T> ClockNode<T> {
         Rid::from_u32(rid)
     }
 
-    fn set_ref(&self, prob: f32) {
+    pub(super) fn set_ref(&self, prob: f32) {
         if rand::thread_rng().gen_bool(prob as f64) {
             self.meta.set_ref();
         }
@@ -60,7 +56,7 @@ impl<T> ClockNode<T> {
 pub(super) struct CacheInner<F> {
     capacity: u32,
     probe_len: u32,
-    probe_rng: f32,
+    pub(super) probe_rng: f32,
     pub(super) metric_ctx: Option<CtxCounter>,
     tls_index: ThreadLocal<AtomicU32>,
     entries: *mut ClockNode<F>,
@@ -168,7 +164,7 @@ impl<F> CacheInner<F> {
 
     /// Replace a old clock node with the new ones based on probability
     /// if find a node within probe length, return the new index as well as the old node
-    fn probe_and_replace_rng<'a>(
+    pub(super) fn probe_and_replace_rng<'a>(
         &'a self,
         new_node: ClockNode<F>,
         rid: Rid,
@@ -242,63 +238,11 @@ impl<F> CacheInner<F> {
         None
     }
 
-    pub(crate) async fn promote_entry<'a, SC: Schema<Field = F, Tuple = T>, T>(
-        &'a self,
-        oid: &mut OidWriteGuard<'a>,
-        storage: &Storage<T>,
-        oid_array: &'a OidArray,
-        schema: &SC,
-    ) -> Option<(usize, Option<(ClockNode<F>, OidWriteGuard<'a>)>)> {
-        if oid.is_cached() {
-            counter!(Counter::ReadHit, self.metric_ctx);
-            return Some((oid.to_cache_index(), None));
-        }
-
-        // We now hit a cache miss and prefetch the data on NVM
-        let tuple_rid = oid.to_rid();
-        let tuple = storage.get(tuple_rid);
-
-        counter!(Counter::ReadMiss, self.metric_ctx);
-
-        debug_assert!(oid.is_rid());
-
-        if self.probe_len == 0 {
-            return None;
-        }
-
-        Prefetcher::fetch(tuple).await;
-
-        let cached_item = schema.to_cached(unsafe { &*tuple.get() });
-        let new_node = ClockNode::new(cached_item, tuple_rid);
-
-        self.probe_and_replace_rng(new_node, tuple_rid, oid, self.probe_rng as f64, oid_array)
-    }
-
-    /// Read with exclusive lock
-    pub(super) async fn read_and_promote<'a: 'b, 'b, SC: Schema<Field = F, Tuple = T>, T>(
-        &'a self,
-        oid: &'b mut OidWriteGuard<'a>,
-        storage: &Storage<T>,
-        oid_array: &'a OidArray,
-        schema: &SC,
-    ) -> Result<(&'a ClockNode<F>, Option<(ClockNode<F>, OidWriteGuard<'a>)>), Rid> {
-        counter!(Counter::ReadCnt, self.metric_ctx);
-
-        let cache_idx = self.promote_entry(oid, storage, oid_array, schema).await;
-
-        match cache_idx {
-            Some((idx, old_node)) => {
-                let entry = self.get_entry(idx);
-
-                entry.set_ref(self.probe_rng);
-                Ok((entry, old_node))
-            }
-            None => Err(oid.to_rid()),
-        }
-    }
-
     #[inline]
-    pub(crate) fn read<'a, L: OidGuard<'a>>(&'a self, oid: &'a L) -> Result<&'a ClockNode<F>, Rid> {
+    pub(crate) fn read<'a, 'b, L: OidGuard<'a>>(
+        &'a self,
+        oid: &'b L,
+    ) -> Result<&'a ClockNode<F>, Rid> {
         counter!(Counter::ReadCnt, self.metric_ctx);
 
         if oid.is_cached() {
@@ -327,7 +271,7 @@ impl<F> CacheInner<F> {
         self.probe_len as usize
     }
 
-    fn get_entry(&self, index: usize) -> &ClockNode<F> {
+    pub(super) fn get_entry(&self, index: usize) -> &ClockNode<F> {
         unsafe { &*self.entries.add(index) }
     }
 

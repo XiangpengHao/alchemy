@@ -6,7 +6,8 @@ pub mod oid;
 mod tests;
 
 use crate::{
-    attribute_cache::Rid,
+    async_task::Prefetcher,
+    attribute_cache::{clock_cache::cache_inner::ClockNode, Rid},
     error::TransactionError,
     query::FieldsMeta,
     storage::{oid_array::OidArray, Storage},
@@ -122,31 +123,58 @@ where
         oid: &'b mut OidWriteGuard<'a>,
         query: &FieldsMeta<N>,
     ) -> QueryValue<'b, S::Field, S::Tuple, OidWriteGuard<'a>> {
-        match self
-            .inner
-            .read_and_promote(oid, &self.storage, &self.oid_array, &self.schema)
-            .await
-        {
-            Ok((entry, evicted)) => {
-                if let Some(evicted) = evicted {
-                    let tuple = self.storage.get_mut(&evicted.0.rid());
-                    self.schema
-                        .write_back(unsafe { &*evicted.0.val.get() }, tuple);
-                }
-
+        let rid = match self.inner.read(oid) {
+            Ok(entry) => {
                 if self.schema.matches(query) {
-                    QueryValue::new(Some(&entry.val), None)
+                    return QueryValue::new(Some(&entry.val), None);
                 } else {
-                    let rid = entry.rid();
                     counter!(Counter::ReadSchemaMiss, self.inner.metric_ctx);
+                    let rid = entry.rid();
                     let tuple = self.storage.get(rid);
-                    QueryValue::new(Some(&entry.val), Some(tuple))
+                    return QueryValue::new(Some(&entry.val), Some(tuple));
                 }
             }
-            Err(rid) => {
-                let tuple = self.storage.get(rid);
-                QueryValue::new(None, Some(tuple))
+            Err(rid) => rid,
+        };
+
+        let tuple_rid = oid.to_rid();
+        debug_assert_eq!(tuple_rid, rid);
+        let tuple = self.storage.get(tuple_rid);
+
+        counter!(Counter::ReadMiss, self.inner.metric_ctx);
+        if self.inner.probe_len() == 0 {
+            return QueryValue::new(None, Some(tuple));
+        }
+
+        Prefetcher::fetch(tuple).await;
+        let cached_item = self.schema.to_cached(unsafe { &*tuple.get() });
+        let new_node = ClockNode::new(cached_item, tuple_rid);
+        if let Some((new_loc, evicted)) = self.inner.probe_and_replace_rng(
+            new_node,
+            tuple_rid,
+            oid,
+            self.inner.probe_rng as f64,
+            &self.oid_array,
+        ) {
+            let entry = self.inner.get_entry(new_loc);
+            entry.set_ref(self.inner.probe_rng);
+
+            if let Some(evicted) = evicted {
+                let tuple = self.storage.get_mut(&evicted.0.rid());
+                self.schema
+                    .write_back(unsafe { &*evicted.0.val.get() }, tuple);
             }
+
+            if self.schema.matches(query) {
+                return QueryValue::new(Some(&entry.val), None);
+            } else {
+                counter!(Counter::ReadSchemaMiss, self.inner.metric_ctx);
+                let rid = entry.rid();
+                let tuple = self.storage.get(rid);
+                return QueryValue::new(Some(&entry.val), Some(tuple));
+            }
+        } else {
+            return QueryValue::new(None, Some(tuple));
         }
     }
 

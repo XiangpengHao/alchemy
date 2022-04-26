@@ -13,7 +13,7 @@ pub(crate) use clock_cache::ClockCache;
 use self::clock_cache::oid::OidWriteGuard;
 
 /// RID: record id, is the offset to the table storage
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Rid {
     id: u32,
 }
