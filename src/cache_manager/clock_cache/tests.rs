@@ -31,7 +31,7 @@ fn clock_insert() {
         let cur_oid = block_on(cache.oid_array.get(*rid)).read();
         if cur_oid.is_rid() {
             let p = cur_oid.to_rid();
-            let storage_p = unsafe { &*cache.storage().get(p).get() };
+            let storage_p = unsafe { &*cache.storage.get(p).get() };
             let item = storage_p.clone();
             assert_eq!(item, TestItem::from_increasing(i));
         } else {
@@ -110,7 +110,7 @@ fn clock_multi_read() {
     for i in 0..item_cnt {
         let (rid, _write_lock) = cache.oid_array.alloc_rid();
         let item = TestItem::from_increasing(i);
-        cache.storage().insert(&rid, item);
+        cache.storage.insert(&rid, item);
         rid_array.push(rid);
     }
 

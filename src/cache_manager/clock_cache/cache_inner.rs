@@ -28,7 +28,7 @@ pub(crate) struct ClockNode<T> {
 
     meta: NodeMeta,
 
-    val: UnsafeCell<T>,
+    pub(super) val: UnsafeCell<T>,
 }
 
 impl<T> ClockNode<T> {
@@ -40,11 +40,7 @@ impl<T> ClockNode<T> {
         }
     }
 
-    fn is_empty(&self) -> bool {
-        self.rid.load(Ordering::Relaxed) == u32::MAX
-    }
-
-    fn rid(&self) -> Rid {
+    pub(super) fn rid(&self) -> Rid {
         let rid = self.rid.load(Ordering::Relaxed);
         debug_assert!(rid != u32::MAX);
         Rid::from_u32(rid)
@@ -74,7 +70,7 @@ where
     metric_ctx: Option<CtxCounter>,
     schema: S,
     tls_index: ThreadLocal<AtomicU32>,
-    storage: Storage<S::Tuple>,
+    pub(super) storage: Storage<S::Tuple>,
     pub(super) oid_array: OidArray,
     entries: *mut ClockNode<S::Field>,
 }
@@ -171,13 +167,9 @@ impl<S: Schema> CacheInner<S> {
         )
     }
 
-    pub(crate) fn storage(&self) -> &Storage<S::Tuple> {
-        &self.storage
-    }
-
     /// Init the tls_index so it will scatter around the whole entry space,
     /// instead of contending on a single slot
-    pub fn thread_init(&self) {
+    pub(crate) fn thread_init(&self) {
         self.tls_index.get_or(|| {
             let mut rng = rand::thread_rng();
 
@@ -201,15 +193,6 @@ impl<S: Schema> CacheInner<S> {
         let clock_node = ClockNode::new(cached_item, rid);
 
         let _index = self.probe_and_replace_rng(clock_node, rid, lock, 1.0);
-    }
-
-    /// Internal api to peek into cache manger (without changing hotness)
-    pub(crate) fn peek(&self, index: usize) -> Option<&S::Field> {
-        if self.get_entry(index).is_empty() {
-            None
-        } else {
-            Some(unsafe { &*self.get_entry(index).val.get() })
-        }
     }
 
     /// returns new index
@@ -295,7 +278,7 @@ impl<S: Schema> CacheInner<S> {
         None
     }
 
-    pub async fn promote_entry<'a>(&'a self, oid: &mut OidWriteGuard<'a>) -> Option<usize> {
+    pub(crate) async fn promote_entry<'a>(&'a self, oid: &mut OidWriteGuard<'a>) -> Option<usize> {
         if oid.is_cached() {
             counter!(Counter::ReadHit, self.metric_ctx);
             return Some(oid.to_cache_index());
@@ -303,7 +286,7 @@ impl<S: Schema> CacheInner<S> {
 
         // We now hit a cache miss and prefetch the data on NVM
         let tuple_rid = oid.to_rid();
-        let tuple = self.storage().get(tuple_rid);
+        let tuple = self.storage.get(tuple_rid);
 
         counter!(Counter::ReadMiss, self.metric_ctx);
 
@@ -322,7 +305,7 @@ impl<S: Schema> CacheInner<S> {
     }
 
     /// Read with exclusive lock
-    pub async fn read_and_promote<'a: 'b, 'b, const N: usize>(
+    pub(super) async fn read_and_promote<'a: 'b, 'b, const N: usize>(
         &'a self,
         oid: &'b mut OidWriteGuard<'a>,
         query: &FieldsMeta<N>,
@@ -342,7 +325,7 @@ impl<S: Schema> CacheInner<S> {
                 } else {
                     counter!(Counter::ReadSchemaMiss, self.metric_ctx);
                     let storage_rid = entry.rid();
-                    let tuple = self.storage().get(storage_rid);
+                    let tuple = self.storage.get(storage_rid);
 
                     QueryValue::new(Some(&entry.val), Some(tuple))
                 }
@@ -356,11 +339,10 @@ impl<S: Schema> CacheInner<S> {
     }
 
     #[inline]
-    pub fn read<'a, L: OidGuard<'a>, const N: usize>(
+    pub(crate) fn read<'a, L: OidGuard<'a>>(
         &'a self,
         oid: &'a L,
-        query: &FieldsMeta<N>,
-    ) -> QueryValue<'a, S::Field, S::Tuple, L> {
+    ) -> Result<&'a ClockNode<S::Field>, Rid> {
         counter!(Counter::ReadCnt, self.metric_ctx);
 
         if oid.is_cached() {
@@ -371,31 +353,19 @@ impl<S: Schema> CacheInner<S> {
 
             counter!(Counter::ReadHit, self.metric_ctx);
 
-            if self.schema.matches(query) {
-                QueryValue::new(Some(&entry.val), None)
-            } else {
-                counter!(Counter::ReadSchemaMiss, self.metric_ctx);
-                let storage_rid = entry.rid();
-                let tuple = self.storage().get(storage_rid);
-
-                QueryValue::new(Some(&entry.val), Some(tuple))
-            }
+            Ok(&entry)
         } else {
-            let tuple_rid = oid.to_rid();
-            let tuple = self.storage().get(tuple_rid);
-
             counter!(Counter::ReadMiss, self.metric_ctx);
-
             debug_assert!(oid.is_rid());
-
-            QueryValue::new(None, Some(tuple))
+            let tuple_rid = oid.to_rid();
+            Err(tuple_rid)
         }
     }
 
     fn replace(&self, index: usize, new: ClockNode<S::Field>) {
         // when _old goes out of scope, the drop will persist the node if it's dirty
         let old = mem::replace(self.get_entry_mut(index), new);
-        let storage = self.storage().get_mut(&old.rid());
+        let storage = self.storage.get_mut(&old.rid());
 
         self.schema.write_back(unsafe { &*old.val.get() }, storage);
     }

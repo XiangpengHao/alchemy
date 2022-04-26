@@ -8,7 +8,7 @@ use crate::{
     utils::prefetch,
 };
 
-pub use clock_cache::ClockCache;
+pub(crate) use clock_cache::ClockCache;
 
 use self::clock_cache::oid::OidWriteGuard;
 

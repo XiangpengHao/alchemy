@@ -201,7 +201,7 @@ where
         oid_guard: &'a L,
         query: &'a FieldsMeta<N>,
     ) -> QueryValue<'a, S::Field, S::Tuple, L> {
-        self.cache.inner.read(oid_guard, query)
+        self.cache.read(oid_guard, query)
     }
 
     pub async fn read_and_promote<'a: 'b, 'b, const N: usize>(
@@ -209,7 +209,7 @@ where
         oid_guard: &'b mut OidWriteGuard<'a>,
         query: &FieldsMeta<N>,
     ) -> QueryValue<'b, S::Field, S::Tuple, OidWriteGuard<'a>> {
-        self.cache.inner.read_and_promote(oid_guard, query).await
+        self.cache.read_and_promote(oid_guard, query).await
     }
 
     pub async fn read_oid(
