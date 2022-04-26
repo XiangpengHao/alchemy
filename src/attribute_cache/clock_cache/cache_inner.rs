@@ -57,18 +57,16 @@ impl<T> ClockNode<T> {
 }
 
 #[repr(C)]
-pub(super) struct CacheInner<S: Schema>
-{
+pub(super) struct CacheInner<F> {
     capacity: u32,
     probe_len: u32,
     probe_rng: f32,
     pub(super) metric_ctx: Option<CtxCounter>,
-    pub(super) schema: S,
     tls_index: ThreadLocal<AtomicU32>,
-    entries: *mut ClockNode<S::Field>,
+    entries: *mut ClockNode<F>,
 }
 
-impl<S: Schema> Drop for CacheInner<S> {
+impl<F> Drop for CacheInner<F> {
     fn drop(&mut self) {
         for i in 0..self.capacity as usize {
             unsafe {
@@ -76,8 +74,8 @@ impl<S: Schema> Drop for CacheInner<S> {
             }
         }
         let layout = alloc::Layout::from_size_align(
-            self.capacity as usize * mem::size_of::<ClockNode<S::Field>>(),
-            mem::align_of::<ClockNode<S::Field>>(),
+            self.capacity as usize * mem::size_of::<ClockNode<F>>(),
+            mem::align_of::<ClockNode<F>>(),
         )
         .unwrap();
         unsafe {
@@ -86,21 +84,19 @@ impl<S: Schema> Drop for CacheInner<S> {
     }
 }
 
-impl<S: Schema> CacheInner<S> {
+impl<F> CacheInner<F> {
     pub(crate) fn new_cap(
         cache_cnt: usize,
         probe_len: usize,
         probe_rng: f32,
-        schema: S,
         metric_ctx: Option<CtxCounter>,
     ) -> Self {
         assert!(cache_cnt > 0);
 
-        let entries_size = cache_cnt * mem::size_of::<ClockNode<S::Field>>();
+        let entries_size = cache_cnt * mem::size_of::<ClockNode<F>>();
         let layout =
-            alloc::Layout::from_size_align(entries_size, mem::align_of::<ClockNode<S::Field>>())
-                .unwrap();
-        let entries = unsafe { alloc::alloc_zeroed(layout) as *mut ClockNode<S::Field> };
+            alloc::Layout::from_size_align(entries_size, mem::align_of::<ClockNode<F>>()).unwrap();
+        let entries = unsafe { alloc::alloc_zeroed(layout) as *mut ClockNode<F> };
 
         for i in 0..cache_cnt {
             let cur_entry = unsafe { &mut *entries.add(i) };
@@ -113,7 +109,6 @@ impl<S: Schema> CacheInner<S> {
             capacity: cache_cnt as u32,
             probe_len: probe_len as u32,
             probe_rng,
-            schema,
             metric_ctx,
         }
     }
@@ -130,11 +125,10 @@ impl<S: Schema> CacheInner<S> {
         cache_size: usize,
         probe_rng: f32,
         probe_len: usize,
-        schema: S,
         metric_ctx: Option<CtxCounter>,
     ) -> Self {
-        let cap = cache_size / mem::size_of::<ClockNode<S::Field>>();
-        CacheInner::new_cap(cap, probe_len, probe_rng, schema, metric_ctx)
+        let cap = cache_size / mem::size_of::<ClockNode<F>>();
+        CacheInner::new_cap(cap, probe_len, probe_rng, metric_ctx)
     }
 
     /// Init the tls_index so it will scatter around the whole entry space,
@@ -148,21 +142,21 @@ impl<S: Schema> CacheInner<S> {
         });
     }
 
-    pub(crate) fn insert<'a>(
+    pub(crate) fn insert<'a, SC: Schema<Field = F, Tuple = T>, T>(
         &'a self,
         lock: &mut OidWriteGuard<'a>,
-        val: &S::Tuple,
-        storage: &Storage<S::Tuple>,
+        val: F,
+        storage: &Storage<T>,
         oid_array: &OidArray,
+        schema: &SC,
     ) {
         assert!(lock.is_rid());
         let rid = lock.to_rid();
 
-        let cached_item = self.schema.to_cached(val);
+        let clock_node = ClockNode::new(val, rid);
 
-        let clock_node = ClockNode::new(cached_item, rid);
-
-        let _index = self.probe_and_replace_rng(clock_node, rid, lock, 1.0, storage, oid_array);
+        let _index =
+            self.probe_and_replace_rng(clock_node, rid, lock, 1.0, storage, oid_array, schema);
     }
 
     /// returns new index
@@ -175,14 +169,15 @@ impl<S: Schema> CacheInner<S> {
 
     /// Replace a old clock node with the new ones based on random probability
     /// return the new index if find a node within probe length
-    fn probe_and_replace_rng<'a>(
+    fn probe_and_replace_rng<'a, SC: Schema<Field = F, Tuple = T>, T>(
         &'a self,
-        new_node: ClockNode<S::Field>,
+        new_node: ClockNode<F>,
         rid: Rid,
         oid: &mut OidWriteGuard<'a>,
         probability: f64,
-        storage: &Storage<S::Tuple>,
+        storage: &Storage<T>,
         oid_array: &OidArray,
+        schema: &SC,
     ) -> Option<usize> {
         if !rand::thread_rng().gen_bool(probability) {
             return None;
@@ -238,7 +233,11 @@ impl<S: Schema> CacheInner<S> {
                 let oid_to_evict = oid_to_evict.unwrap();
                 oid_to_evict.store_rid(&cur_entry.rid());
 
-                self.replace(cur_index, new_node, storage);
+                // when _old goes out of scope, the drop will persist the node if it's dirty
+                let old = mem::replace(self.get_entry_mut(cur_index), new_node);
+                let tuple = storage.get_mut(&old.rid());
+
+                schema.write_back(unsafe { &*old.val.get() }, tuple);
 
                 oid.store_index(cur_index);
 
@@ -250,11 +249,12 @@ impl<S: Schema> CacheInner<S> {
         None
     }
 
-    pub(crate) async fn promote_entry<'a>(
+    pub(crate) async fn promote_entry<'a, SC: Schema<Field = F, Tuple = T>, T>(
         &'a self,
         oid: &mut OidWriteGuard<'a>,
-        storage: &Storage<S::Tuple>,
+        storage: &Storage<T>,
         oid_array: &OidArray,
+        schema: &SC,
     ) -> Option<usize> {
         if oid.is_cached() {
             counter!(Counter::ReadHit, self.metric_ctx);
@@ -275,7 +275,7 @@ impl<S: Schema> CacheInner<S> {
 
         Prefetcher::fetch(tuple).await;
 
-        let cached_item = self.schema.to_cached(unsafe { &*tuple.get() });
+        let cached_item = schema.to_cached(unsafe { &*tuple.get() });
         let new_node = ClockNode::new(cached_item, tuple_rid);
 
         self.probe_and_replace_rng(
@@ -285,19 +285,21 @@ impl<S: Schema> CacheInner<S> {
             self.probe_rng as f64,
             storage,
             oid_array,
+            schema,
         )
     }
 
     /// Read with exclusive lock
-    pub(super) async fn read_and_promote<'a: 'b, 'b>(
+    pub(super) async fn read_and_promote<'a: 'b, 'b, SC: Schema<Field = F, Tuple = T>, T>(
         &'a self,
         oid: &'b mut OidWriteGuard<'a>,
-        storage: &Storage<S::Tuple>,
+        storage: &Storage<T>,
         oid_array: &OidArray,
-    ) -> Result<&'a ClockNode<S::Field>, Rid> {
+        schema: &SC,
+    ) -> Result<&'a ClockNode<F>, Rid> {
         counter!(Counter::ReadCnt, self.metric_ctx);
 
-        let cache_idx = self.promote_entry(oid, storage, oid_array).await;
+        let cache_idx = self.promote_entry(oid, storage, oid_array, schema).await;
 
         match cache_idx {
             Some(idx) => {
@@ -311,10 +313,7 @@ impl<S: Schema> CacheInner<S> {
     }
 
     #[inline]
-    pub(crate) fn read<'a, L: OidGuard<'a>>(
-        &'a self,
-        oid: &'a L,
-    ) -> Result<&'a ClockNode<S::Field>, Rid> {
+    pub(crate) fn read<'a, L: OidGuard<'a>>(&'a self, oid: &'a L) -> Result<&'a ClockNode<F>, Rid> {
         counter!(Counter::ReadCnt, self.metric_ctx);
 
         if oid.is_cached() {
@@ -334,14 +333,6 @@ impl<S: Schema> CacheInner<S> {
         }
     }
 
-    fn replace(&self, index: usize, new: ClockNode<S::Field>, storage: &Storage<S::Tuple>) {
-        // when _old goes out of scope, the drop will persist the node if it's dirty
-        let old = mem::replace(self.get_entry_mut(index), new);
-        let tuple = storage.get_mut(&old.rid());
-
-        self.schema.write_back(unsafe { &*old.val.get() }, tuple);
-    }
-
     pub(super) fn capacity(&self) -> usize {
         self.capacity as usize
     }
@@ -351,12 +342,12 @@ impl<S: Schema> CacheInner<S> {
         self.probe_len as usize
     }
 
-    fn get_entry(&self, index: usize) -> &ClockNode<S::Field> {
+    fn get_entry(&self, index: usize) -> &ClockNode<F> {
         unsafe { &*self.entries.add(index) }
     }
 
     #[allow(clippy::mut_from_ref)]
-    fn get_entry_mut(&self, index: usize) -> &mut ClockNode<S::Field> {
+    fn get_entry_mut(&self, index: usize) -> &mut ClockNode<F> {
         unsafe { &mut *self.entries.add(index) }
     }
 
