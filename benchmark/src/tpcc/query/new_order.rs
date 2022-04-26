@@ -1,11 +1,11 @@
 use std::time::SystemTime;
 
 use alchemy::{
-    block_on,
     attribute_cache::{
         clock_cache::oid::{OidReadGuard, OidWriteGuard},
         Schema,
     },
+    block_on,
     error::TransactionError,
 };
 use rand::{prelude::SmallRng, thread_rng, Rng, SeedableRng};

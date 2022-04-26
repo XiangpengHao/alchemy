@@ -54,7 +54,7 @@ where
 
     #[inline]
     pub(crate) fn schema(&self) -> &S {
-        self.inner.schema()
+        &self.inner.schema
     }
 
     #[inline]
@@ -90,7 +90,7 @@ where
     ) -> QueryValue<'a, S::Field, S::Tuple, L> {
         match self.inner.read(oid_read) {
             Ok(entry) => {
-                if self.inner.schema().matches(query) {
+                if self.inner.schema.matches(query) {
                     QueryValue::new(Some(&entry.val), None)
                 } else {
                     counter!(Counter::ReadSchemaMiss, self.inner.metric_ctx);
@@ -117,7 +117,7 @@ where
             .await
         {
             Ok(entry) => {
-                if self.inner.schema().matches(query) {
+                if self.inner.schema.matches(query) {
                     QueryValue::new(Some(&entry.val), None)
                 } else {
                     let rid = entry.rid();

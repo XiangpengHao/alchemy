@@ -58,14 +58,12 @@ impl<T> ClockNode<T> {
 
 #[repr(C)]
 pub(super) struct CacheInner<S: Schema>
-where
-    S::Tuple: 'static,
 {
     capacity: u32,
     probe_len: u32,
     probe_rng: f32,
     pub(super) metric_ctx: Option<CtxCounter>,
-    schema: S,
+    pub(super) schema: S,
     tls_index: ThreadLocal<AtomicU32>,
     entries: *mut ClockNode<S::Field>,
 }
@@ -366,9 +364,5 @@ impl<S: Schema> CacheInner<S> {
         self.tls_index
             .get_or(|| AtomicU32::new(0))
             .load(Ordering::Relaxed) as usize
-    }
-
-    pub(super) fn schema(&self) -> &S {
-        &self.schema
     }
 }
